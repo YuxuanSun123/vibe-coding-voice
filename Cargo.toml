@@ -1,0 +1,17 @@
+[package]
+name = "vibe-coding-voice-native"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+arboard = "3"
+cpal = "0.16"
+eframe = "0.31"
+egui = "0.31"
+enigo = "0.2"
+global-hotkey = "0.7"
+serde_json = "1"
+tray-icon = "0.21"
+transcribe-rs = { version = "=0.2.9", features = ["sense_voice"] }
+windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging"] }
