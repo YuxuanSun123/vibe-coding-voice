@@ -1,1 +1,4 @@
 /target
+/target-live
+target-live/
+*.swp
