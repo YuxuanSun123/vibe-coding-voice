@@ -26,6 +26,22 @@ function New-CapsulePath([float]$X, [float]$Y, [float]$Width, [float]$Height) {
     return $path
 }
 
+function Snap-Float([double]$Value, [double]$Step) {
+    if ($Step -le 0) { return [double]$Value }
+    return [Math]::Round($Value / $Step) * $Step
+}
+
+function New-RoundedRectPath([float]$X, [float]$Y, [float]$Width, [float]$Height, [float]$Radius) {
+    $diameter = [Math]::Min($Radius * 2.0, [Math]::Min($Width, $Height))
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddArc($X, $Y, $diameter, $diameter, 180, 90)
+    $path.AddArc($X + $Width - $diameter, $Y, $diameter, $diameter, 270, 90)
+    $path.AddArc($X + $Width - $diameter, $Y + $Height - $diameter, $diameter, $diameter, 0, 90)
+    $path.AddArc($X, $Y + $Height - $diameter, $diameter, $diameter, 90, 90)
+    $path.CloseFigure()
+    return $path
+}
+
 function Format-Elapsed([long]$StartedAtMs) {
     if ($StartedAtMs -le 0) {
         return '0:00'
@@ -52,6 +68,26 @@ function Draw-MicButton($Graphics, [float]$CenterX, [float]$CenterY) {
 
         $innerRingPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(165, 226, 222, 215), 1.5)
         $Graphics.DrawEllipse($innerRingPen, ($CenterX - 21.5), ($CenterY - 21.5), 43, 43)
+    } elseif ($script:mode -eq 'processing') {
+        foreach ($phaseOffset in @(0.0, 0.4, 0.8)) {
+            $progress = (($script:phase * 0.018) + $phaseOffset) % 1.0
+            $ringSize = 42 + ($progress * 18)
+            $ringAlpha = [int](78 * (1.0 - $progress))
+            if ($ringAlpha -gt 0) {
+                $ringPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb($ringAlpha, 232, 228, 220), 2)
+                $Graphics.DrawEllipse($ringPen, ($CenterX - ($ringSize / 2)), ($CenterY - ($ringSize / 2)), $ringSize, $ringSize)
+            }
+        }
+
+        $glow = (1.0 + [Math]::Sin($script:phase * 0.12)) / 2.0
+        $coreAlpha = [int](135 + ($glow * 65))
+        $coreSize = 9.5 + ($glow * 2.0)
+        $innerRingAlpha = [int](80 + ($glow * 50))
+        $innerRingPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb($innerRingAlpha, 244, 241, 236), 1.5)
+        $Graphics.DrawEllipse($innerRingPen, ($CenterX - 13.5), ($CenterY - 13.5), 27, 27)
+        $coreBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($coreAlpha, 255, 255, 255))
+        $Graphics.FillEllipse($coreBrush, ($CenterX - ($coreSize / 2)), ($CenterY - ($coreSize / 2)), $coreSize, $coreSize)
+        return
     } else {
         $ringPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(225, 221, 214), 2)
         $Graphics.DrawEllipse($ringPen, ($CenterX - 24), ($CenterY - 24), 48, 48)
@@ -84,6 +120,10 @@ $script:phase = 0.0
 $script:level = 0.0
 $script:startedAtMs = 0
 $script:lastVisible = $false
+$script:processingMorph = 0.0
+$script:clock = [System.Diagnostics.Stopwatch]::StartNew()
+$script:lastTickMs = 0
+$script:lastStatePollMs = 0
 
 $transparency = [System.Drawing.Color]::FromArgb(255, 1, 0, 1)
 $form = New-Object System.Windows.Forms.Form
@@ -111,46 +151,100 @@ $form.Add_Paint({
     $g = $e.Graphics
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.Clear($transparency)
+    $morph = $script:processingMorph
+    $isProcessing = $script:mode -eq 'processing'
+    $capsuleCenterX = $form.ClientSize.Width / 2.0
+    $capsuleCenterY = 39.0
+    $capsuleWidth = 406.0 + ((272.0 - 406.0) * $morph)
+    $capsuleHeight = 58.0 + ((52.0 - 58.0) * $morph)
+    $capsuleX = $capsuleCenterX - ($capsuleWidth / 2.0)
+    $capsuleY = $capsuleCenterY - ($capsuleHeight / 2.0)
 
-    $shadowPath = New-CapsulePath 12 14 406 58
+    # Snap to a half-pixel grid to stabilize AA during morph animation.
+    $capsuleX = Snap-Float $capsuleX 0.5
+    $capsuleY = Snap-Float $capsuleY 0.5
+    $capsuleWidth = [Math]::Max(1.0, (Snap-Float $capsuleWidth 0.5))
+    $capsuleHeight = [Math]::Max(1.0, (Snap-Float $capsuleHeight 0.5))
+    $shadowX = $capsuleX + 2
+    $shadowY = $capsuleY + 4
+
+    $shadowPath = New-CapsulePath $shadowX $shadowY $capsuleWidth $capsuleHeight
     $shadowBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(38, 0, 0, 0))
     $g.FillPath($shadowBrush, $shadowPath)
 
-    $capsulePath = New-CapsulePath 10 10 406 58
+    $capsulePath = New-CapsulePath $capsuleX $capsuleY $capsuleWidth $capsuleHeight
     $capsuleBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(250, 250, 247))
-    $borderPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(18, 0, 0, 0), 1)
     $g.FillPath($capsuleBrush, $capsulePath)
-    $g.DrawPath($borderPen, $capsulePath)
-    Draw-MicButton $g 42 39
+    # Softer 2-layer border to hide subpixel jaggies.
+    $borderOuter = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(18, 0, 0, 0), 2)
+    $borderOuter.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+    $borderInner = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(48, 0, 0, 0), 1)
+    $borderInner.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+    $g.DrawPath($borderOuter, $capsulePath)
+    $g.DrawPath($borderInner, $capsulePath)
+    if (-not $isProcessing -and $morph -lt 0.35) {
+        Draw-MicButton $g ($capsuleX + 32) $capsuleCenterY
+    }
 
     switch ($script:mode) {
         'processing' {
             $font = New-Object System.Drawing.Font($script:fontFamily, 10.5, [System.Drawing.FontStyle]::Regular)
             $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(21, 20, 15))
-            $mutedBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(136, 133, 119))
-            for ($i = 0; $i -lt 3; $i++) {
-                $offset = [Math]::Sin($script:phase * 0.18 + $i * 0.8)
-                $alpha = [int](110 + (100 * (($offset + 1.0) / 2.0)))
-                $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($alpha, 21, 20, 15))
-                $g.FillEllipse($brush, 86 + ($i * 11), 33, 6, 6)
-            }
-            $g.DrawString($script:processingText, $font, $textBrush, 126, 26)
-            $g.DrawString((Format-Elapsed $script:startedAtMs), $font, $mutedBrush, 348, 26)
+            $textRect = New-Object System.Drawing.RectangleF($capsuleX, $capsuleY, $capsuleWidth, $capsuleHeight)
+            $format = New-Object System.Drawing.StringFormat
+            $format.Alignment = [System.Drawing.StringAlignment]::Center
+            $format.LineAlignment = [System.Drawing.StringAlignment]::Center
+            # Center the label within the capsule; keep enough height to avoid clipping.
+            $g.DrawString($script:processingText, $font, $textBrush, $textRect, $format)
+
+            $trackPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(24, 21, 20, 15), 1)
+            $trackPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $trackPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $trackLeft = $capsuleX + (($capsuleWidth - 92) / 2)
+            $trackRight = $trackLeft + 92
+            $trackY = $capsuleCenterY + 14
+            $g.DrawLine($trackPen, $trackLeft, $trackY, $trackRight, $trackY)
+
+            $phase = (($script:phase * 0.024) % 1.0)
+            $segmentWidth = 34
+            $segmentCenterX = $trackLeft + (92 * $phase)
+            $segmentLeft = $segmentCenterX - ($segmentWidth / 2)
+            $segmentRight = $segmentCenterX + ($segmentWidth / 2)
+            $segmentBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+                (New-Object System.Drawing.PointF($segmentLeft, $trackY)),
+                (New-Object System.Drawing.PointF($segmentRight, $trackY)),
+                [System.Drawing.Color]::FromArgb(0, 21, 20, 15),
+                [System.Drawing.Color]::FromArgb(0, 21, 20, 15)
+            )
+            $segmentBlend = New-Object System.Drawing.Drawing2D.ColorBlend
+            $segmentBlend.Colors = @(
+                [System.Drawing.Color]::FromArgb(0, 21, 20, 15),
+                [System.Drawing.Color]::FromArgb(150, 21, 20, 15),
+                [System.Drawing.Color]::FromArgb(0, 21, 20, 15)
+            )
+            $segmentBlend.Positions = @(0.0, 0.5, 1.0)
+            $segmentBrush.InterpolationColors = $segmentBlend
+            $segmentPen = New-Object System.Drawing.Pen($segmentBrush, 2.2)
+            $segmentPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $segmentPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($segmentPen, $segmentLeft, $trackY, $segmentRight, $trackY)
         }
         'error' {
             $font = New-Object System.Drawing.Font($script:fontFamily, 10.5, [System.Drawing.FontStyle]::Regular)
             $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(154, 42, 34))
-            $g.DrawString($script:errorText, $font, $textBrush, 86, 26)
+            $g.DrawString($script:errorText, $font, $textBrush, ($capsuleX + 76), ($capsuleCenterY - 13))
         }
         default {
             $linePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(18, 21, 20, 15), 1)
-            $g.DrawLine($linePen, 86, 39, 286, 39)
+            $contentLeft = $capsuleX + 76
+            $contentRight = $capsuleX + 276
+            $g.DrawLine($linePen, $contentLeft, $capsuleCenterY, $contentRight, $capsuleCenterY)
             $wave = 1.4 + ($script:level * 10.0)
             for ($i = 0; $i -lt 28; $i++) {
                 $speed = 0.75 + (($i % 5) * 0.18)
-                $x = 86 + ((($script:phase * $speed * 6.1) + ($i * 10.2)) % 200)
+                $x = $contentLeft + ((($script:phase * $speed * 6.1) + ($i * 10.2)) % 200)
                 $jitter = (1.5 + ($i % 3)) * $wave
-                $y = 39 + ([Math]::Sin(($script:phase * 0.35) + ($i * 0.7)) * $jitter)
+                $y = $capsuleCenterY + ([Math]::Sin(($script:phase * 0.35) + ($i * 0.7)) * $jitter)
                 $tone = (($script:phase * 0.55) + ($i * 0.5))
                 $depth = [Math]::Max(0.0, [Math]::Min(1.0, 0.5 + ([Math]::Sin($tone) * 0.5)))
                 $darkness = [Math]::Max(0.0, [Math]::Min(1.0, 0.20 + ($depth * 0.65) + ($script:level * 0.25)))
@@ -164,33 +258,61 @@ $form.Add_Paint({
 
             $font = New-Object System.Drawing.Font($script:fontFamily, 9.5, [System.Drawing.FontStyle]::Regular)
             $labelBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(90, 88, 82))
-            $g.DrawString($script:listeningText, $font, $labelBrush, 322, 27)
+            $labelRect = New-Object System.Drawing.RectangleF(
+                ($capsuleX + $capsuleWidth - 120),
+                $capsuleY,
+                108,
+                $capsuleHeight
+            )
+            $labelFormat = New-Object System.Drawing.StringFormat
+            $labelFormat.Alignment = [System.Drawing.StringAlignment]::Far
+            $labelFormat.LineAlignment = [System.Drawing.StringAlignment]::Center
+            $g.DrawString($script:listeningText, $font, $labelBrush, $labelRect, $labelFormat)
         }
     }
 })
 
 $timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 33
+$timer.Interval = 16
 $timer.Add_Tick({
-    $script:phase += 1.0
+    $nowMs = [int]$script:clock.ElapsedMilliseconds
+    $dtMs = $nowMs - $script:lastTickMs
+    if ($dtMs -le 0) { $dtMs = 16 }
+    if ($dtMs -gt 80) { $dtMs = 80 } # avoid huge jumps after stalls
+    $script:lastTickMs = $nowMs
 
-    if ($StateFile -and (Test-Path $StateFile)) {
-        try {
-            $raw = Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8
-            if (-not [string]::IsNullOrWhiteSpace($raw)) {
-                $state = $raw | ConvertFrom-Json
-                $script:visible = [bool]$state.visible
-                $script:mode = if ($state.mode) { [string]$state.mode } else { 'listening' }
-                $script:level = if ($null -ne $state.level) { [double]$state.level } else { 0.0 }
-                $script:startedAtMs = if ($null -ne $state.started_at_ms) { [long]$state.started_at_ms } else { 0 }
+    # Keep the original "phase units" (roughly 1.0 per 33ms) so existing animation math stays consistent.
+    $script:phase += ($dtMs / 33.0)
+
+    # Throttle state polling (JSON read/parse) to reduce stutter.
+    if ($nowMs - $script:lastStatePollMs -ge 80) {
+        $script:lastStatePollMs = $nowMs
+        if ($StateFile -and (Test-Path $StateFile)) {
+            try {
+                $raw = Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8
+                if (-not [string]::IsNullOrWhiteSpace($raw)) {
+                    $state = $raw | ConvertFrom-Json
+                    $script:visible = [bool]$state.visible
+                    $script:mode = if ($state.mode) { [string]$state.mode } else { 'listening' }
+                    $script:level = if ($null -ne $state.level) { [double]$state.level } else { 0.0 }
+                    $script:startedAtMs = if ($null -ne $state.started_at_ms) { [long]$state.started_at_ms } else { 0 }
+                }
+            } catch {
             }
-        } catch {
+        } else {
+            $script:visible = $false
+            $script:mode = 'idle'
+            $script:level = 0.0
+            $script:startedAtMs = 0
         }
-    } else {
-        $script:visible = $false
-        $script:mode = 'idle'
-        $script:level = 0.0
-        $script:startedAtMs = 0
+    }
+
+    $targetMorph = if ($script:mode -eq 'processing') { 1.0 } else { 0.0 }
+    # Time-based smoothing: stable speed at 30/60fps and less "micro-jitter".
+    $alpha = 1.0 - [Math]::Exp(-([double]$dtMs / 120.0))
+    $script:processingMorph += ($targetMorph - $script:processingMorph) * $alpha
+    if ([Math]::Abs($targetMorph - $script:processingMorph) -lt 0.002) {
+        $script:processingMorph = $targetMorph
     }
 
     if ($script:visible -and -not $script:lastVisible) {

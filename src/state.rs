@@ -1,5 +1,14 @@
 use crate::sensevoice;
 
+const DEFAULT_SHORTCUT: &str = "ctrl+z";
+const DEFAULT_SHORTCUT_STATUS: &str = "快捷键尚未注册。";
+const DEFAULT_STATUS_MESSAGE: &str = "原生输入法已启动，下一步接全局快捷键、录音和自动投送。";
+const DEFAULT_PRACTICE_TEXT: &str =
+    "帮我把这个登录流程加上 refresh token，并补齐错误处理和测试。";
+const DEFAULT_MODEL_STATUS: &str = "尚未检查 SenseVoice 本地模型。";
+const DEFAULT_MODEL_SUMMARY: &str = "当前默认指向官方 sherpa-onnx SenseVoice int8 目录；如果你切回旧 FunASR 风格目录，程序也会尝试把 `tokens.json` 转成 `tokens.txt` 再探测加载。";
+const DEFAULT_RECORDING_INFO: &str = "尚未开始真实录音。";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputMode {
     CodeEdit,
@@ -35,19 +44,14 @@ impl InputMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeliveryTarget {
     Cursor,
+    #[allow(dead_code)]
     VsCodeChat,
+    #[allow(dead_code)]
     CopilotChat,
     GenericInput,
 }
 
 impl DeliveryTarget {
-    pub const ALL: [DeliveryTarget; 4] = [
-        DeliveryTarget::Cursor,
-        DeliveryTarget::VsCodeChat,
-        DeliveryTarget::CopilotChat,
-        DeliveryTarget::GenericInput,
-    ];
-
     pub fn label(self) -> &'static str {
         match self {
             DeliveryTarget::Cursor => "Cursor",
@@ -67,18 +71,6 @@ pub enum InputState {
     Error,
 }
 
-impl InputState {
-    pub fn label(self) -> &'static str {
-        match self {
-            InputState::Idle => "待机",
-            InputState::Recording => "录音中",
-            InputState::Processing => "处理中",
-            InputState::Success => "成功",
-            InputState::Error => "错误",
-        }
-    }
-}
-
 pub struct NativeAppState {
     pub shortcut: String,
     pub shortcut_registered: bool,
@@ -91,7 +83,6 @@ pub struct NativeAppState {
     pub raw_text: String,
     pub delivered_text: String,
     pub practice_text: String,
-    pub debug_clicks: u32,
     pub auto_paste: bool,
     pub local_model_dir: String,
     pub local_model_ready: bool,
@@ -103,27 +94,25 @@ pub struct NativeAppState {
 impl Default for NativeAppState {
     fn default() -> Self {
         Self {
-            shortcut: "ctrl+z".to_string(),
+            shortcut: DEFAULT_SHORTCUT.to_string(),
             shortcut_registered: false,
             shortcut_recording: false,
-            shortcut_status: "快捷键尚未注册。".to_string(),
+            shortcut_status: DEFAULT_SHORTCUT_STATUS.to_string(),
             input_mode: InputMode::CodeEdit,
             delivery_target: DeliveryTarget::Cursor,
             input_state: InputState::Idle,
-            status_message: "原生输入法已启动，下一步接全局快捷键、录音和自动投送。".to_string(),
+            status_message: DEFAULT_STATUS_MESSAGE.to_string(),
             raw_text: String::new(),
             delivered_text: String::new(),
-            practice_text: "帮我把这个登录流程加上 refresh token，并补齐错误处理和测试。"
-                .to_string(),
-            debug_clicks: 0,
+            practice_text: DEFAULT_PRACTICE_TEXT.to_string(),
             auto_paste: true,
             local_model_dir: sensevoice::default_model_dir()
                 .to_string_lossy()
                 .into_owned(),
             local_model_ready: false,
-            local_model_status: "尚未检查 SenseVoice 本地模型。".to_string(),
-            local_model_summary: "当前默认指向官方 sherpa-onnx SenseVoice int8 目录；如果你切回旧 FunASR 风格目录，程序也会尝试把 `tokens.json` 转成 `tokens.txt` 再探测加载。".to_string(),
-            last_recording_info: "尚未开始真实录音。".to_string(),
+            local_model_status: DEFAULT_MODEL_STATUS.to_string(),
+            local_model_summary: DEFAULT_MODEL_SUMMARY.to_string(),
+            last_recording_info: DEFAULT_RECORDING_INFO.to_string(),
         }
     }
 }

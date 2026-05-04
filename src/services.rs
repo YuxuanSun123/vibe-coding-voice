@@ -34,6 +34,34 @@ struct RecordingCapture {
     duration_secs: f32,
 }
 
+#[derive(Clone)]
+pub struct FinishInputSnapshot {
+    input_mode: InputMode,
+    delivery_target: DeliveryTarget,
+    auto_paste: bool,
+    local_model_dir: String,
+    local_model_ready: bool,
+    local_model_status: String,
+    local_model_summary: String,
+}
+
+pub struct FinishInputWork {
+    normalized_samples: Vec<f32>,
+    last_recording_info: String,
+    snapshot: FinishInputSnapshot,
+}
+
+pub struct FinishInputResult {
+    pub input_state: InputState,
+    pub status_message: String,
+    pub raw_text: Option<String>,
+    pub delivered_text: Option<String>,
+    pub local_model_ready: bool,
+    pub local_model_status: String,
+    pub local_model_summary: String,
+    pub last_recording_info: String,
+}
+
 struct OverlayUiState {
     visible: bool,
     mode: String,
@@ -119,11 +147,9 @@ pub fn begin_input(state: &mut NativeAppState) {
     }
 }
 
-pub fn finish_input(state: &mut NativeAppState) {
+pub fn begin_finish_input(state: &mut NativeAppState) -> Result<FinishInputWork> {
     if state.input_state != InputState::Recording {
-        state.input_state = InputState::Error;
-        state.status_message = "当前没有正在进行的口述。".to_string();
-        return;
+        return Err(anyhow!("当前没有正在进行的口述。"));
     }
 
     state.input_state = InputState::Processing;
@@ -134,52 +160,108 @@ pub fn finish_input(state: &mut NativeAppState) {
         Ok(capture) => capture,
         Err(error) => {
             hide_recording_overlay();
-            state.input_state = InputState::Error;
-            state.status_message = format!("停止录音失败: {error:#}");
-            return;
+            return Err(error);
         }
     };
 
-    state.last_recording_info = format!(
+    let last_recording_info = format!(
         "录音完成，原始采样率 {} Hz，通道 {}，时长约 {:.2} 秒。",
         capture.sample_rate, capture.channels, capture.duration_secs
     );
+    state.last_recording_info = last_recording_info.clone();
 
-    let normalized_samples = resample_to_target(capture.samples, capture.sample_rate, capture.channels);
+    let normalized_samples =
+        resample_to_target(capture.samples, capture.sample_rate, capture.channels);
     if normalized_samples.is_empty() {
         hide_recording_overlay();
-        state.input_state = InputState::Error;
-        state.status_message = "录到的音频为空，请再试一次。".to_string();
-        return;
+        return Err(anyhow!("录到的音频为空，请再试一次。"));
     }
 
-    match transcribe_recording(state, normalized_samples) {
-        Ok((segments, delivery_message)) => {
-            state.input_state = InputState::Success;
-            state.status_message = format!(
-                "SenseVoice 转写完成，已识别 {} 个字符，切出了 {} 段。{}",
-                state.raw_text.chars().count(),
-                segments,
-                delivery_message
-            );
+    Ok(FinishInputWork {
+        normalized_samples,
+        last_recording_info,
+        snapshot: FinishInputSnapshot {
+            input_mode: state.input_mode,
+            delivery_target: state.delivery_target,
+            auto_paste: state.auto_paste,
+            local_model_dir: state.local_model_dir.clone(),
+            local_model_ready: state.local_model_ready,
+            local_model_status: state.local_model_status.clone(),
+            local_model_summary: state.local_model_summary.clone(),
+        },
+    })
+}
+
+pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
+    let FinishInputWork {
+        normalized_samples,
+        last_recording_info,
+        snapshot,
+    } = work;
+
+    let mut local_model_ready = snapshot.local_model_ready;
+    let mut local_model_status = snapshot.local_model_status.clone();
+    let mut local_model_summary = snapshot.local_model_summary.clone();
+
+    let result = (|| -> Result<(String, String, usize, String)> {
+        if !local_model_ready {
+            let probe = sensevoice::prepare_and_probe(std::path::Path::new(&snapshot.local_model_dir))?;
+            local_model_ready = true;
+            local_model_status = "SenseVoice 已可被 Rust provider 加载。".to_string();
+            local_model_summary = sensevoice::format_probe_summary(&probe);
+        }
+
+        let transcript = sensevoice::transcribe_audio(
+            std::path::Path::new(&snapshot.local_model_dir),
+            normalized_samples,
+        )?;
+        let raw_text = normalize_text(&transcript.text);
+        let delivered_text = transform_text(snapshot.input_mode, &raw_text);
+        let delivery_message =
+            deliver_output_from_snapshot(&snapshot, delivered_text.trim())?;
+        Ok((
+            raw_text,
+            delivered_text,
+            transcript.segment_count,
+            delivery_message,
+        ))
+    })();
+
+    match result {
+        Ok((raw_text, delivered_text, segments, delivery_message)) => {
             hide_recording_overlay();
+            FinishInputResult {
+                input_state: InputState::Success,
+                status_message: format!(
+                    "SenseVoice 转写完成，已识别 {} 个字符，切出了 {} 段。{}",
+                    raw_text.chars().count(),
+                    segments,
+                    delivery_message
+                ),
+                raw_text: Some(raw_text),
+                delivered_text: Some(delivered_text),
+                local_model_ready,
+                local_model_status,
+                local_model_summary,
+                last_recording_info,
+            }
         }
         Err(error) => {
-            state.input_state = InputState::Error;
-            state.status_message = format!("SenseVoice 转写失败: {error:#}");
             let _ = show_recording_overlay("error");
             thread::sleep(std::time::Duration::from_millis(900));
             hide_recording_overlay();
+            FinishInputResult {
+                input_state: InputState::Error,
+                status_message: format!("SenseVoice 转写失败: {error:#}"),
+                raw_text: None,
+                delivered_text: None,
+                local_model_ready,
+                local_model_status,
+                local_model_summary,
+                last_recording_info,
+            }
         }
     }
-}
-
-pub fn clear_result(state: &mut NativeAppState) {
-    hide_recording_overlay();
-    state.input_state = InputState::Idle;
-    state.raw_text.clear();
-    state.delivered_text.clear();
-    state.status_message = "结果已清空。".to_string();
 }
 
 pub fn check_local_model(state: &mut NativeAppState) {
@@ -375,33 +457,31 @@ fn linear_resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     output
 }
 
-fn transcribe_recording(state: &mut NativeAppState, samples: Vec<f32>) -> Result<(usize, String)> {
-    if !state.local_model_ready {
-        let probe = sensevoice::prepare_and_probe(std::path::Path::new(&state.local_model_dir))?;
-        state.local_model_ready = true;
-        state.local_model_status = "SenseVoice 已可被 Rust provider 加载。".to_string();
-        state.local_model_summary = sensevoice::format_probe_summary(&probe);
-    }
-
-    let transcript =
-        sensevoice::transcribe_audio(std::path::Path::new(&state.local_model_dir), samples)?;
-    state.raw_text = normalize_text(&transcript.text);
-    state.delivered_text = transform_text(state.input_mode, &state.raw_text);
-    let delivery_message = deliver_output(state)?;
-    Ok((transcript.segment_count, delivery_message))
+fn deliver_output(state: &NativeAppState) -> Result<String> {
+    deliver_output_from_snapshot(
+        &FinishInputSnapshot {
+            input_mode: state.input_mode,
+            delivery_target: state.delivery_target,
+            auto_paste: state.auto_paste,
+            local_model_dir: state.local_model_dir.clone(),
+            local_model_ready: state.local_model_ready,
+            local_model_status: state.local_model_status.clone(),
+            local_model_summary: state.local_model_summary.clone(),
+        },
+        state.delivered_text.trim(),
+    )
 }
 
-fn deliver_output(state: &NativeAppState) -> Result<String> {
-    let text = state.delivered_text.trim();
+fn deliver_output_from_snapshot(snapshot: &FinishInputSnapshot, text: &str) -> Result<String> {
     if text.is_empty() {
         return Ok("没有可投送的文本。".to_string());
     }
 
-    if !state.auto_paste {
+    if !snapshot.auto_paste {
         return Ok("已生成投送文本，但自动粘贴已关闭。".to_string());
     }
 
-    match state.delivery_target {
+    match snapshot.delivery_target {
         DeliveryTarget::GenericInput => {
             hide_recording_overlay();
             write_clipboard(text)?;
@@ -414,10 +494,7 @@ fn deliver_output(state: &NativeAppState) -> Result<String> {
             write_clipboard(text)?;
             focus_delivery_target_window();
             simulate_paste_shortcut()?;
-            Ok(format!(
-                "已复制到剪贴板，并尝试粘贴到 {}。",
-                state.delivery_target.label()
-            ))
+            Ok(format!("已复制到剪贴板，并尝试粘贴到 {}。", snapshot.delivery_target.label()))
         }
     }
 }

@@ -10,15 +10,19 @@ use eframe::egui::{self, FontData, FontDefinitions, FontFamily};
 use std::fs;
 use std::sync::Arc;
 
+const WINDOW_TITLE: &str = "Vibe Coding Voice";
+const WINDOW_INNER_SIZE: [f32; 2] = [560.0, 520.0];
+const WINDOW_MIN_INNER_SIZE: [f32; 2] = [500.0, 440.0];
+const FONT_CANDIDATES: [&str; 3] = [
+    r"c:\Windows\Fonts\msyh.ttc",
+    r"c:\Windows\Fonts\msyhl.ttc",
+    r"c:\Windows\Fonts\simhei.ttf",
+];
+
 fn configure_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
-    let candidates = [
-        r"c:\Windows\Fonts\msyh.ttc",
-        r"c:\Windows\Fonts\msyhl.ttc",
-        r"c:\Windows\Fonts\simhei.ttf",
-    ];
 
-    for path in candidates {
+    for path in FONT_CANDIDATES {
         let Ok(bytes) = fs::read(path) else {
             continue;
         };
@@ -43,14 +47,14 @@ fn configure_fonts(ctx: &egui::Context) {
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Vibe Coding Voice")
-            .with_inner_size([560.0, 520.0])
-            .with_min_inner_size([500.0, 440.0]),
+            .with_title(WINDOW_TITLE)
+            .with_inner_size(WINDOW_INNER_SIZE)
+            .with_min_inner_size(WINDOW_MIN_INNER_SIZE),
         ..Default::default()
     };
 
     eframe::run_native(
-        "Vibe Coding Voice",
+        WINDOW_TITLE,
         options,
         Box::new(|cc| {
             configure_fonts(&cc.egui_ctx);

@@ -1,7 +1,7 @@
 use crate::hotkeys::{HotkeyController, build_hotkey, install_event_handler};
 use crate::services::{
-    begin_input, check_local_model, finish_input, prepare_recording_overlay_host,
-    run_practice_flow,
+    FinishInputResult, begin_finish_input, begin_input, check_local_model,
+    prepare_recording_overlay_host, run_finish_input_work, run_practice_flow,
 };
 use crate::state::{DeliveryTarget, InputMode, InputState, NativeAppState};
 use crate::tray::TrayController;
@@ -11,6 +11,8 @@ use eframe::egui::{
     RichText, Sense, Stroke, StrokeKind, TextEdit, Vec2,
 };
 use global_hotkey::hotkey::Code;
+use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::thread;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -108,6 +110,11 @@ struct LayoutTokens {
     record_top_padding_min: f32,
     record_hint_gap: f32,
     record_status_gap: f32,
+    shortcut_hint_height: f32,
+    recording_hint_height: f32,
+    record_status_height: f32,
+    record_status_offset_y: f32,
+    processing_spinner_radius: f32,
     key_chip_padding: Margin,
     key_chip_radius: u8,
     section_gap: f32,
@@ -136,7 +143,12 @@ impl Default for LayoutTokens {
             record_pulse_width: 2.0,
             record_top_padding_min: 12.0,
             record_hint_gap: 10.0,
-            record_status_gap: 16.0,
+            record_status_gap: 10.0,
+            shortcut_hint_height: 55.0,
+            recording_hint_height: 26.0,
+            record_status_height: 28.0,
+            record_status_offset_y: -3.0,
+            processing_spinner_radius: 61.0,
             key_chip_padding: Margin::symmetric(8, 4),
             key_chip_radius: 6,
             section_gap: 4.0,
@@ -154,14 +166,12 @@ impl Default for LayoutTokens {
 }
 
 impl LayoutTokens {
-    fn recording_content_height(&self, input_state: InputState) -> f32 {
-        let status_height = if matches!(input_state, InputState::Recording | InputState::Processing)
-        {
-            28.0
-        } else {
-            22.0
-        };
-        self.record_button_size + self.record_hint_gap + 40.0 + self.record_status_gap + status_height
+    fn recording_content_height(&self, _input_state: InputState) -> f32 {
+        self.record_button_size
+            + self.record_hint_gap
+            + self.shortcut_hint_height
+            + self.record_status_gap
+            + self.record_status_height
     }
 }
 
@@ -253,6 +263,7 @@ pub struct VoiceInputNativeApp {
     tray_controller: Option<TrayController>,
     current_page: AppPage,
     recording_started_at: Option<Instant>,
+    pending_finish_result: Option<Receiver<FinishInputResult>>,
     pending_toast: Option<ToastDraft>,
     toast: Option<ToastState>,
     theme: ThemeMode,
@@ -267,6 +278,7 @@ impl Default for VoiceInputNativeApp {
             tray_controller: None,
             current_page: AppPage::Home,
             recording_started_at: None,
+            pending_finish_result: None,
             pending_toast: None,
             toast: None,
             theme: ThemeMode::Paper,
@@ -296,6 +308,7 @@ impl eframe::App for VoiceInputNativeApp {
             self.show_toast_now(ctx, pending.kind, pending.message);
         }
 
+        self.poll_finish_input_result(ctx);
         self.capture_shortcut_if_needed(ctx);
         self.handle_global_hotkey(ctx);
 
@@ -504,6 +517,7 @@ impl VoiceInputNativeApp {
             let button_size = Vec2::splat(theme.layout.record_button_size);
             let (rect, response) = ui.allocate_exact_size(button_size, Sense::click());
             let painter = ui.painter_at(rect);
+            let overlay_painter = ui.painter();
             let center = rect.center();
             let is_recording = self.state.input_state == InputState::Recording;
             let is_busy = matches!(self.state.input_state, InputState::Processing);
@@ -548,7 +562,12 @@ impl VoiceInputNativeApp {
                 theme.palette.ink
             };
             painter.circle_filled(center, theme.layout.record_button_radius, fill);
-            self.paint_mic_icon(&painter, center, theme.palette.ink_text);
+            if is_busy {
+                self.paint_processing_spinner(overlay_painter, ctx, center, theme);
+                self.paint_processing_core(&painter, ctx, center, theme);
+            } else {
+                self.paint_mic_icon(&painter, center, theme.palette.ink_text);
+            }
 
             if response.clicked() && !is_busy {
                 self.toggle_recording(ctx);
@@ -558,32 +577,44 @@ impl VoiceInputNativeApp {
             self.show_shortcut_hint(ui, theme);
             ui.add_space(theme.layout.record_status_gap);
 
-            if is_recording {
-                ui.vertical_centered(|ui| {
-                    ui.label(
-                        RichText::new(self.recording_elapsed_label())
-                            .font(FontId::monospace(20.0))
-                            .color(theme.palette.text_primary),
-                    );
-                });
-            } else if self.state.input_state == InputState::Processing {
-                ui.vertical_centered(|ui| {
-                    ui.label(
-                        RichText::new("识别中…")
-                            .font(FontId::monospace(17.0))
-                            .color(theme.palette.text_muted),
-                    );
-                });
-            } else {
-                ui.add_space(22.0);
-            }
+            ui.allocate_ui_with_layout(
+                Vec2::new(ui.available_width(), theme.layout.record_status_height),
+                Layout::top_down(Align::Center),
+                |ui| {
+                    let status_rect = ui.max_rect();
+                    if is_recording {
+                        ui.painter().text(
+                            egui::pos2(
+                                status_rect.center().x,
+                                status_rect.center().y + theme.layout.record_status_offset_y,
+                            ),
+                            Align2::CENTER_CENTER,
+                            self.recording_elapsed_label(),
+                            FontId::monospace(20.0),
+                            theme.palette.text_primary,
+                        );
+                    } else if self.state.input_state == InputState::Processing {
+                        ui.painter().text(
+                            egui::pos2(
+                                status_rect.center().x,
+                                status_rect.center().y + theme.layout.record_status_offset_y,
+                            ),
+                            Align2::CENTER_CENTER,
+                            self.processing_status_label(ctx),
+                            FontId::monospace(17.0),
+                            theme.palette.text_muted,
+                        );
+                    }
+                },
+            );
         });
     }
 
     fn show_shortcut_hint(&self, ui: &mut egui::Ui, theme: &Theme) {
+        let hint_height = theme.layout.shortcut_hint_height;
         if self.state.shortcut_recording {
             ui.allocate_ui_with_layout(
-                Vec2::new(ui.available_width(), 20.0),
+                Vec2::new(ui.available_width(), hint_height),
                 Layout::top_down(Align::Center),
                 |ui| {
                     ui.centered_and_justified(|ui| {
@@ -600,7 +631,7 @@ impl VoiceInputNativeApp {
 
         if self.state.input_state == InputState::Recording {
             ui.allocate_ui_with_layout(
-                Vec2::new(ui.available_width(), 20.0),
+                Vec2::new(ui.available_width(), theme.layout.recording_hint_height),
                 Layout::top_down(Align::Center),
                 |ui| {
                     ui.centered_and_justified(|ui| {
@@ -615,71 +646,88 @@ impl VoiceInputNativeApp {
             return;
         }
 
+        if self.state.input_state == InputState::Processing {
+            ui.allocate_ui_with_layout(
+                Vec2::new(ui.available_width(), hint_height),
+                Layout::top_down(Align::Center),
+                |_ui| {},
+            );
+            return;
+        }
+
         ui.allocate_ui_with_layout(
-            Vec2::new(ui.available_width(), 34.0),
+            Vec2::new(ui.available_width(), hint_height),
             Layout::top_down(Align::Center),
             |ui| {
-                let row_width = self.shortcut_row_width(ui, theme);
-                let left_space = ((ui.available_width() - row_width) * 0.5).max(0.0);
-                ui.horizontal(|ui| {
-                    if left_space > 0.0 {
-                        ui.add_space(left_space);
-                    }
-                    ui.spacing_mut().item_spacing.x = 6.0;
+                ui.vertical_centered(|ui| {
                     ui.allocate_ui_with_layout(
-                        Vec2::new(self.shortcut_text_width(ui, theme, "按"), 32.0),
+                        Vec2::new(ui.available_width(), 34.0),
+                        Layout::top_down(Align::Center),
+                        |ui| {
+                            let row_width = self.shortcut_row_width(ui, theme);
+                            let left_space = ((ui.available_width() - row_width) * 0.5).max(0.0);
+                            ui.horizontal(|ui| {
+                                if left_space > 0.0 {
+                                    ui.add_space(left_space);
+                                }
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                ui.allocate_ui_with_layout(
+                                    Vec2::new(self.shortcut_text_width(ui, theme, "按"), 32.0),
+                                    Layout::top_down(Align::Center),
+                                    |ui| {
+                                        ui.centered_and_justified(|ui| {
+                                            ui.label(
+                                                RichText::new("按")
+                                                    .size(11.0)
+                                                    .color(theme.palette.text_muted),
+                                            );
+                                        });
+                                    },
+                                );
+                                for part in self.state.shortcut.split('+') {
+                                    let key_frame = Frame::default()
+                                        .fill(theme.palette.card_bg)
+                                        .stroke(Stroke::new(1.0, theme.palette.border))
+                                        .corner_radius(CornerRadius::same(theme.layout.key_chip_radius))
+                                        .inner_margin(theme.layout.key_chip_padding);
+                                    key_frame.show(ui, |ui| {
+                                        ui.label(
+                                            RichText::new(part)
+                                                .size(11.0)
+                                                .color(theme.palette.text_primary)
+                                                .family(egui::FontFamily::Monospace),
+                                        );
+                                    });
+                                }
+                                ui.allocate_ui_with_layout(
+                                    Vec2::new(self.shortcut_text_width(ui, theme, "开始口述"), 32.0),
+                                    Layout::top_down(Align::Center),
+                                    |ui| {
+                                        ui.centered_and_justified(|ui| {
+                                            ui.label(
+                                                RichText::new("开始口述")
+                                                    .size(11.0)
+                                                    .color(theme.palette.text_muted),
+                                            );
+                                        });
+                                    },
+                                );
+                            });
+                        },
+                    );
+                    ui.add_space(theme.layout.small_gap);
+                    ui.allocate_ui_with_layout(
+                        Vec2::new(ui.available_width(), 18.0),
                         Layout::top_down(Align::Center),
                         |ui| {
                             ui.centered_and_justified(|ui| {
                                 ui.label(
-                                    RichText::new("按")
+                                    RichText::new("或点击麦克风按钮")
                                         .size(11.0)
                                         .color(theme.palette.text_muted),
                                 );
                             });
                         },
-                    );
-                    for part in self.state.shortcut.split('+') {
-                        let key_frame = Frame::default()
-                            .fill(theme.palette.card_bg)
-                            .stroke(Stroke::new(1.0, theme.palette.border))
-                            .corner_radius(CornerRadius::same(theme.layout.key_chip_radius))
-                            .inner_margin(theme.layout.key_chip_padding);
-                        key_frame.show(ui, |ui| {
-                            ui.label(
-                                RichText::new(part)
-                                    .size(11.0)
-                                    .color(theme.palette.text_primary)
-                                    .family(egui::FontFamily::Monospace),
-                            );
-                        });
-                    }
-                    ui.allocate_ui_with_layout(
-                        Vec2::new(self.shortcut_text_width(ui, theme, "开始口述"), 32.0),
-                        Layout::top_down(Align::Center),
-                        |ui| {
-                            ui.centered_and_justified(|ui| {
-                                ui.label(
-                                    RichText::new("开始口述")
-                                        .size(11.0)
-                                        .color(theme.palette.text_muted),
-                                );
-                            });
-                        },
-                    );
-                });
-            },
-        );
-        ui.add_space(theme.layout.small_gap);
-        ui.allocate_ui_with_layout(
-            Vec2::new(ui.available_width(), 18.0),
-            Layout::top_down(Align::Center),
-            |ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.label(
-                        RichText::new("或点击麦克风按钮")
-                            .size(11.0)
-                            .color(theme.palette.text_muted),
                     );
                 });
             },
@@ -863,23 +911,53 @@ impl VoiceInputNativeApp {
                     ui.separator();
                     ui.label(RichText::new("全局快捷键").size(14.0).strong());
                     ui.add_space(4.0);
-                    ui.horizontal(|ui| {
-                        let capture_label = if self.state.shortcut_recording {
-                            "按下新的组合键..."
-                        } else {
-                            &self.state.shortcut
-                        };
-                        ui.label(RichText::new(capture_label).family(egui::FontFamily::Monospace));
+                    ui.allocate_ui_with_layout(
+                        Vec2::new(ui.available_width(), 34.0),
+                        Layout::left_to_right(Align::Center),
+                        |ui| {
+                            ui.spacing_mut().item_spacing.x = 10.0;
+                            let capture_label = if self.state.shortcut_recording {
+                                "按下新的组合键..."
+                            } else {
+                                &self.state.shortcut
+                            };
+                            ui.allocate_ui_with_layout(
+                                Vec2::new(64.0, 32.0),
+                                Layout::left_to_right(Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        RichText::new(capture_label)
+                                            .size(12.0)
+                                            .family(egui::FontFamily::Monospace),
+                                    );
+                                },
+                            );
 
-                        let button_text = if self.state.shortcut_recording {
-                            "取消"
-                        } else {
-                            "更改快捷键"
-                        };
-                        if ui.button(button_text).clicked() {
-                            self.toggle_shortcut_recording();
-                        }
-                    });
+                            let button_text = if self.state.shortcut_recording {
+                                "取消"
+                            } else {
+                                "更改快捷键"
+                            };
+                            let button = Button::new(
+                                RichText::new(button_text)
+                                    .size(12.0)
+                                    .color(theme.palette.text_primary)
+                                    .strong(),
+                            )
+                            .fill(theme.palette.card_bg)
+                            .stroke(Stroke::new(1.0, theme.palette.border))
+                            .corner_radius(CornerRadius::same(10))
+                            .min_size(Vec2::new(132.0, 32.0));
+                            if ui.add(button).clicked() {
+                                self.toggle_shortcut_recording();
+                            }
+                        },
+                    );
+                    ui.label(
+                        RichText::new(&self.state.shortcut_status)
+                            .size(12.0)
+                            .color(theme.palette.text_muted),
+                    );
 
                     ui.separator();
                     ui.label(RichText::new("本地模型").size(14.0).strong());
@@ -1005,10 +1083,70 @@ impl VoiceInputNativeApp {
 
     fn toggle_recording(&mut self, ctx: &egui::Context) {
         if self.state.input_state == InputState::Recording {
-            finish_input(&mut self.state);
+            self.finish_input_async(ctx);
         } else {
             begin_input(&mut self.state);
+            self.sync_after_action(ctx);
         }
+    }
+
+    fn finish_input_async(&mut self, ctx: &egui::Context) {
+        let work = match begin_finish_input(&mut self.state) {
+            Ok(work) => work,
+            Err(error) => {
+                self.state.input_state = InputState::Error;
+                self.state.status_message = format!("{error:#}");
+                self.sync_after_action(ctx);
+                return;
+            }
+        };
+
+        let (sender, receiver) = mpsc::channel();
+        self.pending_finish_result = Some(receiver);
+        self.sync_after_action(ctx);
+        ctx.request_repaint();
+
+        thread::spawn(move || {
+            let result = run_finish_input_work(work);
+            let _ = sender.send(result);
+        });
+    }
+
+    fn poll_finish_input_result(&mut self, ctx: &egui::Context) {
+        let Some(receiver) = self.pending_finish_result.take() else {
+            return;
+        };
+
+        match receiver.try_recv() {
+            Ok(result) => {
+                self.apply_finish_input_result(ctx, result);
+            }
+            Err(TryRecvError::Empty) => {
+                self.pending_finish_result = Some(receiver);
+            }
+            Err(TryRecvError::Disconnected) => {
+                self.state.input_state = InputState::Error;
+                self.state.status_message = "后台识别任务意外中断。".to_string();
+                self.sync_after_action(ctx);
+            }
+        }
+    }
+
+    fn apply_finish_input_result(&mut self, ctx: &egui::Context, result: FinishInputResult) {
+        self.state.input_state = result.input_state;
+        self.state.status_message = result.status_message;
+        self.state.local_model_ready = result.local_model_ready;
+        self.state.local_model_status = result.local_model_status;
+        self.state.local_model_summary = result.local_model_summary;
+        self.state.last_recording_info = result.last_recording_info;
+
+        if let Some(raw_text) = result.raw_text {
+            self.state.raw_text = raw_text;
+        }
+        if let Some(delivered_text) = result.delivered_text {
+            self.state.delivered_text = delivered_text;
+        }
+
         self.sync_after_action(ctx);
     }
 
@@ -1052,6 +1190,84 @@ impl VoiceInputNativeApp {
         format!("{minutes}:{seconds:02}")
     }
 
+    fn processing_status_label(&self, ctx: &egui::Context) -> String {
+        let dots = ((ctx.input(|input| input.time) * 2.6) as usize % 3) + 1;
+        format!("识别中{}", ".".repeat(dots))
+    }
+
+    fn paint_processing_spinner(
+        &self,
+        painter: &egui::Painter,
+        ctx: &egui::Context,
+        center: egui::Pos2,
+        theme: &Theme,
+    ) {
+        let time = ctx.input(|input| input.time) as f32;
+        let phase = (time * 0.72).fract();
+
+        for offset in [0.0_f32, 0.4_f32, 0.8_f32] {
+            let progress = (phase + offset).fract();
+            let radius = theme.layout.record_button_radius
+                + 6.0
+                + (theme.layout.processing_spinner_radius - theme.layout.record_button_radius)
+                    * progress;
+            let alpha = (72.0 * (1.0 - progress)).round() as u8;
+            if alpha == 0 {
+                continue;
+            }
+            painter.circle_stroke(
+                center,
+                radius,
+                Stroke::new(
+                    theme.layout.record_pulse_width,
+                    Color32::from_rgba_unmultiplied(
+                        theme.palette.ink_text.r(),
+                        theme.palette.ink_text.g(),
+                        theme.palette.ink_text.b(),
+                        alpha,
+                    ),
+                ),
+            );
+        }
+    }
+
+    fn paint_processing_core(
+        &self,
+        painter: &egui::Painter,
+        ctx: &egui::Context,
+        center: egui::Pos2,
+        theme: &Theme,
+    ) {
+        let time = ctx.input(|input| input.time) as f32;
+        let glow = ((time * 2.6).sin() * 0.5 + 0.5) as f32;
+        let outer_alpha = (78.0 + glow * 52.0).round() as u8;
+        let inner_alpha = (130.0 + glow * 70.0).round() as u8;
+
+        painter.circle_stroke(
+            center,
+            theme.layout.record_button_radius - 10.0,
+            Stroke::new(
+                1.6,
+                Color32::from_rgba_unmultiplied(
+                    theme.palette.ink_text.r(),
+                    theme.palette.ink_text.g(),
+                    theme.palette.ink_text.b(),
+                    outer_alpha,
+                ),
+            ),
+        );
+        painter.circle_filled(
+            center,
+            10.0 + glow * 1.6,
+            Color32::from_rgba_unmultiplied(
+                theme.palette.ink_text.r(),
+                theme.palette.ink_text.g(),
+                theme.palette.ink_text.b(),
+                inner_alpha,
+            ),
+        );
+    }
+
     fn paint_mic_icon(&self, painter: &egui::Painter, center: egui::Pos2, color: Color32) {
         let stroke = Stroke::new(3.6, color);
         let body = egui::Rect::from_center_size(
@@ -1091,14 +1307,26 @@ impl VoiceInputNativeApp {
         }
 
         let captured = ctx.input(|input| {
-            input.events.iter().find_map(|event| match event {
+            input.events.iter().rev().find_map(|event| match event {
                 egui::Event::Key {
                     key,
                     pressed: true,
                     repeat: false,
                     modifiers,
                     ..
-                } => Some((*key, *modifiers)),
+                } => {
+                    if *key == egui::Key::Escape
+                        && !modifiers.alt
+                        && !modifiers.ctrl
+                        && !modifiers.shift
+                    {
+                        Some((*key, *modifiers))
+                    } else if build_hotkey(*modifiers, *key).is_ok() {
+                        Some((*key, *modifiers))
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             })
         });
