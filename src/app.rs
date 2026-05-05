@@ -11,6 +11,7 @@ use eframe::egui::{
     RichText, Sense, Stroke, StrokeKind, TextEdit, Vec2,
 };
 use global_hotkey::hotkey::Code;
+use std::process::Command;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -947,12 +948,33 @@ impl VoiceInputNativeApp {
                     ui.separator();
                     ui.label(RichText::new("本地模型").size(14.0).strong());
                     ui.add_space(4.0);
+
                     ui.label(
                         RichText::new("模型目录")
                             .size(12.0)
                             .color(theme.palette.text_muted),
                     );
-                    ui.text_edit_singleline(&mut self.state.local_model_dir);
+                    ui.horizontal(|ui| {
+                        ui.add_sized(
+                            Vec2::new((ui.available_width() - 104.0).max(220.0), 28.0),
+                            TextEdit::singleline(&mut self.state.local_model_dir),
+                        );
+                        let browse = Button::new(
+                            RichText::new("选择文件夹")
+                                .size(12.0)
+                                .color(theme.palette.text_primary)
+                                .strong(),
+                        )
+                        .fill(theme.palette.card_bg)
+                        .stroke(Stroke::new(1.0, theme.palette.border))
+                        .corner_radius(CornerRadius::same(10))
+                        .min_size(Vec2::new(96.0, 28.0));
+                        if ui.add(browse).clicked()
+                            && let Some(folder) = pick_model_folder(&self.state.local_model_dir)
+                        {
+                            self.state.local_model_dir = folder;
+                        }
+                    });
                     ui.add_space(6.0);
                     if ui.button("检查 SenseVoice").clicked() {
                         check_local_model(&mut self.state);
@@ -1515,30 +1537,42 @@ impl VoiceInputNativeApp {
 fn transform_text(mode: InputMode, input: &str) -> String {
     match mode {
         InputMode::CodeEdit => [
-            "请基于当前代码上下文执行以下修改:",
+            "请基于当前项目和代码上下文完成以下修改:",
             &format!("- 需求: {input}"),
-            "- 先理解现有实现",
-            "- 保持改动范围尽量小",
-            "- 给出必要的关键说明",
+            "- 先理解现有实现和相关依赖关系",
+            "- 优先做最小必要改动，不要无关重构",
+            "- 保持原有代码风格和命名习惯",
+            "- 修改后说明改了哪些文件、做了什么",
         ]
         .join("\n"),
         InputMode::DirectPrompt => input.to_string(),
-        InputMode::BugReport => [
-            "问题描述:",
-            input,
-            "",
-            "复现步骤:",
-            "1. 待补充",
-            "2. 待补充",
-        ]
-        .join("\n"),
-        InputMode::CommitMessage => format!("feat: {input}"),
-        InputMode::TerminalCommand => [
-            "请生成或说明终端命令，要求如下:",
-            &format!("- 目标: {input}"),
-            "- 优先给出可直接执行的命令",
-        ]
-        .join("\n"),
-        InputMode::DocPolish => format!("请将以下口述整理为清晰的技术说明:\n{input}"),
     }
+}
+
+fn pick_model_folder(current_dir: &str) -> Option<String> {
+    let script = r#"
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+$dialog.Description = 'Select SenseVoice model folder'
+if ($env:VIBE_MODEL_DIR -and (Test-Path -LiteralPath $env:VIBE_MODEL_DIR)) {
+    $dialog.SelectedPath = $env:VIBE_MODEL_DIR
+}
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.SelectedPath
+}
+"#;
+
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-STA", "-Command", script])
+        .env("VIBE_MODEL_DIR", current_dir)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let folder = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!folder.is_empty()).then_some(folder)
 }

@@ -12,30 +12,15 @@ const DEFAULT_RECORDING_INFO: &str = "尚未开始真实录音。";
 pub enum InputMode {
     CodeEdit,
     DirectPrompt,
-    BugReport,
-    CommitMessage,
-    TerminalCommand,
-    DocPolish,
 }
 
 impl InputMode {
-    pub const ALL: [InputMode; 6] = [
-        InputMode::DirectPrompt,
-        InputMode::CodeEdit,
-        InputMode::BugReport,
-        InputMode::CommitMessage,
-        InputMode::TerminalCommand,
-        InputMode::DocPolish,
-    ];
+    pub const ALL: [InputMode; 2] = [InputMode::DirectPrompt, InputMode::CodeEdit];
 
     pub fn label(self) -> &'static str {
         match self {
             InputMode::CodeEdit => "改代码",
             InputMode::DirectPrompt => "原文输出",
-            InputMode::BugReport => "报错求助",
-            InputMode::CommitMessage => "提交说明",
-            InputMode::TerminalCommand => "终端命令",
-            InputMode::DocPolish => "技术说明",
         }
     }
 }

@@ -747,30 +747,14 @@ fn focus_delivery_target_window() {
 fn transform_text(mode: InputMode, input: &str) -> String {
     match mode {
         InputMode::CodeEdit => [
-            "请基于当前代码上下文执行以下修改:",
+            "请基于当前项目和代码上下文完成以下修改:",
             &format!("- 需求: {input}"),
-            "- 先理解现有实现",
-            "- 保持改动范围尽量小",
-            "- 给出必要的关键说明",
+            "- 先理解现有实现和相关依赖关系",
+            "- 优先做最小必要改动，不要无关重构",
+            "- 保持原有代码风格和命名习惯",
+            "- 修改后说明改了哪些文件、做了什么",
         ]
         .join("\n"),
         InputMode::DirectPrompt => input.to_string(),
-        InputMode::BugReport => [
-            "问题描述:",
-            input,
-            "",
-            "复现步骤:",
-            "1. 待补充",
-            "2. 待补充",
-        ]
-        .join("\n"),
-        InputMode::CommitMessage => format!("feat: {input}"),
-        InputMode::TerminalCommand => [
-            "请生成或说明终端命令，要求如下:",
-            &format!("- 目标: {input}"),
-            "- 优先给出可直接执行的命令",
-        ]
-        .join("\n"),
-        InputMode::DocPolish => format!("请将以下口述整理为清晰的技术说明:\n{input}"),
     }
 }
