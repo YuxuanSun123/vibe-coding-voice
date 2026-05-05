@@ -108,6 +108,7 @@ struct LayoutTokens {
     record_button_radius: f32,
     record_pulse_width: f32,
     record_top_padding_min: f32,
+    record_content_offset_y: f32,
     record_hint_gap: f32,
     record_status_gap: f32,
     shortcut_hint_height: f32,
@@ -132,9 +133,14 @@ struct LayoutTokens {
 impl Default for LayoutTokens {
     fn default() -> Self {
         Self {
-            top_bar_height: 30.0,
-            panel_margin: Margin::symmetric(16, 8),
-            top_bar_margin: Margin::symmetric(12, 2),
+            top_bar_height: 56.0,
+            panel_margin: Margin {
+                left: 16,
+                right: 16,
+                top: 0,
+                bottom: 8,
+            },
+            top_bar_margin: Margin::symmetric(12, 0),
             result_panel_margin: Margin::symmetric(16, 7),
             status_chip_padding: Margin::symmetric(10, 4),
             status_chip_radius: 24,
@@ -142,6 +148,7 @@ impl Default for LayoutTokens {
             record_button_radius: 44.0,
             record_pulse_width: 2.0,
             record_top_padding_min: 12.0,
+            record_content_offset_y: 28.0,
             record_hint_gap: 10.0,
             record_status_gap: 10.0,
             shortcut_hint_height: 55.0,
@@ -269,7 +276,7 @@ impl Default for VoiceInputNativeApp {
             theme: ThemeMode::Paper,
             theme_applied: false,
         };
-        app.state.input_mode = InputMode::CodeEdit;
+        app.state.input_mode = InputMode::DirectPrompt;
         app.state.delivery_target = DeliveryTarget::GenericInput;
         app.initialize_shortcut();
         app.initialize_tray();
@@ -318,24 +325,19 @@ impl eframe::App for VoiceInputNativeApp {
                     .inner_margin(theme.layout.panel_margin),
             )
             .show(ctx, |ui| {
-                let top_bar_inner_height = (theme.layout.top_bar_height
-                    - f32::from(theme.layout.top_bar_margin.top)
-                    - f32::from(theme.layout.top_bar_margin.bottom))
-                .max(0.0);
-                let top_bar_response = ui.allocate_ui_with_layout(
+                let (top_bar_rect, _) = ui.allocate_exact_size(
                     Vec2::new(ui.available_width(), theme.layout.top_bar_height),
-                    Layout::top_down(Align::Min),
+                    Sense::hover(),
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new()
+                        .max_rect(top_bar_rect)
+                        .layout(Layout::left_to_right(Align::Center)),
                     |ui| {
-                        Frame::default()
-                            .fill(theme.palette.panel_bg)
-                            .inner_margin(theme.layout.top_bar_margin)
-                            .show(ui, |ui| {
-                                ui.set_min_height(top_bar_inner_height);
-                                TopBar::show(self, ui, ctx, &theme);
-                            });
+                        TopBar::show(self, ui, ctx, &theme);
                     },
                 );
-                let divider_y = top_bar_response.response.rect.bottom();
+                let divider_y = top_bar_rect.bottom();
                 let divider_left = ui.max_rect().left() - f32::from(theme.layout.panel_margin.left)
                     + theme.layout.divider_inset;
                 let divider_right = ui.max_rect().right()
@@ -414,6 +416,10 @@ impl VoiceInputNativeApp {
     }
 
     fn show_top_bar(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
+        let content_rect = ui
+            .max_rect()
+            .shrink2(Vec2::new(f32::from(theme.layout.top_bar_margin.left), 0.0));
+
         if self.current_page == AppPage::Settings {
             ui.horizontal(|ui| {
                 let back = Button::new(
@@ -443,55 +449,62 @@ impl VoiceInputNativeApp {
 
         let (status_text, dot_color) = self.status_chip(ctx, theme);
 
-        ui.allocate_ui_with_layout(
-            Vec2::new(ui.available_width(), 24.0),
-            Layout::left_to_right(Align::Center),
-            |ui| {
-                let chip = Frame::default()
-                    .fill(theme.palette.ink)
-                    .corner_radius(CornerRadius::same(theme.layout.status_chip_radius))
-                    .inner_margin(theme.layout.status_chip_padding);
-                chip.show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        let (dot_rect, _) =
-                            ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
-                        ui.painter()
-                            .circle_filled(dot_rect.center(), 5.0, dot_color);
-                        ui.add_space(4.0);
-                        ui.label(
-                            RichText::new(status_text)
-                                .size(13.0)
-                                .color(theme.palette.ink_text)
-                                .strong(),
-                        );
-                    });
-                });
-
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let gear = Button::new(
-                        RichText::new("⚙")
-                            .size(18.0)
-                            .color(theme.palette.text_muted),
-                    )
-                    .fill(Color32::TRANSPARENT)
-                    .stroke(Stroke::NONE)
-                    .corner_radius(CornerRadius::same(10))
-                    .min_size(Vec2::splat(20.0));
-                    if ui.add(gear).clicked() {
-                        self.current_page = AppPage::Settings;
-                    }
-                });
-            },
+        let painter = ui.painter();
+        let center_y = content_rect.center().y;
+        let text_galley = painter.layout_no_wrap(
+            status_text.to_owned(),
+            FontId::proportional(13.0),
+            theme.palette.ink_text,
         );
+        let chip_padding_x = f32::from(theme.layout.status_chip_padding.left)
+            + f32::from(theme.layout.status_chip_padding.right);
+        let chip_padding_y = f32::from(theme.layout.status_chip_padding.top)
+            + f32::from(theme.layout.status_chip_padding.bottom);
+        let chip_height = (text_galley.size().y + chip_padding_y).max(38.0);
+        let chip_width = (text_galley.size().x + chip_padding_x + 38.0).max(132.0);
+        let chip_rect = egui::Rect::from_min_size(
+            egui::pos2(content_rect.left(), center_y - chip_height * 0.5),
+            Vec2::new(chip_width, chip_height),
+        );
+
+        painter.rect_filled(
+            chip_rect,
+            CornerRadius::same(theme.layout.status_chip_radius),
+            theme.palette.ink,
+        );
+        painter.circle_filled(
+            egui::pos2(chip_rect.left() + 22.0, center_y),
+            5.0,
+            dot_color,
+        );
+        painter.galley(
+            egui::pos2(
+                chip_rect.left() + 42.0,
+                center_y - text_galley.size().y * 0.5,
+            ),
+            text_galley,
+            theme.palette.ink_text,
+        );
+
+        let settings_rect = egui::Rect::from_center_size(
+            egui::pos2(content_rect.right() - 38.0, center_y),
+            Vec2::splat(32.0),
+        );
+        if self.show_settings_icon_button_at(ui, theme, settings_rect) {
+            self.current_page = AppPage::Settings;
+        }
     }
 
     fn show_recording_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
-        let top_space = ((ui.available_height()
-            - theme
-                .layout
-                .recording_content_height(self.state.input_state))
-            * 0.5)
-            .max(theme.layout.record_top_padding_min);
+        let available_height = ui.available_height();
+        let content_height = theme
+            .layout
+            .recording_content_height(self.state.input_state);
+        let centered_top_space =
+            ((available_height - content_height) * 0.5).max(theme.layout.record_top_padding_min);
+        let max_down_offset = (available_height - content_height - centered_top_space).max(0.0);
+        let top_space =
+            centered_top_space + theme.layout.record_content_offset_y.min(max_down_offset);
         ui.add_space(top_space);
 
         ui.vertical_centered(|ui| {
@@ -781,13 +794,7 @@ impl VoiceInputNativeApp {
             Vec2::new(ui.available_width(), control_band_height),
             Layout::right_to_left(Align::Center),
             |ui| {
-                egui::ComboBox::from_id_salt("inline_input_mode")
-                    .selected_text(self.state.input_mode.label())
-                    .show_ui(ui, |ui| {
-                        for mode in InputMode::ALL {
-                            ui.selectable_value(&mut self.state.input_mode, mode, mode.label());
-                        }
-                    });
+                self.show_input_mode_combo(ui, theme);
             },
         );
         let editor_frame = Frame::default()
@@ -985,6 +992,71 @@ impl VoiceInputNativeApp {
                             .color(theme.palette.text_muted),
                     );
                     ui.label(RichText::new(&self.state.local_model_summary).size(12.0));
+                });
+        });
+    }
+
+    fn show_settings_icon_button_at(
+        &self,
+        ui: &mut egui::Ui,
+        theme: &Theme,
+        rect: egui::Rect,
+    ) -> bool {
+        let response = ui.interact(rect, Id::new("settings_icon_button"), Sense::click());
+        let response = response.on_hover_text("设置");
+        let visuals = if response.hovered() || response.has_focus() {
+            ui.painter()
+                .circle_filled(rect.center(), 13.0, theme.palette.card_bg);
+            Stroke::new(1.8, theme.palette.text_primary)
+        } else {
+            Stroke::new(1.7, theme.palette.text_muted)
+        };
+
+        self.paint_settings_icon(ui.painter(), rect.center(), visuals);
+        response.clicked()
+    }
+
+    fn paint_settings_icon(&self, painter: &egui::Painter, center: egui::Pos2, stroke: Stroke) {
+        for (y, knob_x) in [(-6.0, -2.5), (0.0, 4.0), (6.0, -5.0)] {
+            let y = center.y + y;
+            painter.line_segment(
+                [egui::pos2(center.x - 8.0, y), egui::pos2(center.x + 8.0, y)],
+                stroke,
+            );
+            painter.circle_filled(egui::pos2(center.x + knob_x, y), 2.5, stroke.color);
+        }
+    }
+
+    fn show_input_mode_combo(&mut self, ui: &mut egui::Ui, theme: &Theme) {
+        ui.scope(|ui| {
+            let mut style = (**ui.style()).clone();
+            for visuals in [
+                &mut style.visuals.widgets.inactive,
+                &mut style.visuals.widgets.hovered,
+                &mut style.visuals.widgets.active,
+                &mut style.visuals.widgets.open,
+            ] {
+                visuals.weak_bg_fill = theme.palette.card_bg;
+                visuals.bg_fill = theme.palette.card_bg;
+                visuals.bg_stroke = Stroke::new(1.0, theme.palette.border);
+                visuals.fg_stroke = Stroke::new(1.0, theme.palette.text_primary);
+                visuals.corner_radius = CornerRadius::same(6);
+            }
+            style.spacing.combo_width = 148.0;
+            ui.set_style(style);
+
+            egui::ComboBox::from_id_salt("inline_input_mode")
+                .width(148.0)
+                .selected_text(
+                    RichText::new(self.state.input_mode.label())
+                        .size(13.0)
+                        .color(theme.palette.text_primary)
+                        .strong(),
+                )
+                .show_ui(ui, |ui| {
+                    for mode in InputMode::ALL {
+                        ui.selectable_value(&mut self.state.input_mode, mode, mode.label());
+                    }
                 });
         });
     }

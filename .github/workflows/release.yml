@@ -41,6 +41,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $bundle | Out-Null
           Copy-Item target/release/vibe-coding-voice-native.exe $bundle/
           Copy-Item target/release/*.dll $bundle/ -ErrorAction SilentlyContinue
+          Copy-Item assets $bundle/assets -Recurse
           Copy-Item recording-overlay.ps1 $bundle/
           Copy-Item README.md $bundle/
           Copy-Item LICENSE $bundle/

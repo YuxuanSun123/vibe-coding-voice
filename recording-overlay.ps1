@@ -54,6 +54,12 @@ function Format-Elapsed([long]$StartedAtMs) {
     return '{0}:{1:d2}' -f $minutes, $seconds
 }
 
+$script:micIconImage = $null
+$micIconPath = Join-Path $PSScriptRoot 'assets\mic-main-white.png'
+if (Test-Path $micIconPath) {
+    $script:micIconImage = [System.Drawing.Image]::FromFile($micIconPath)
+}
+
 function Draw-MicButton($Graphics, [float]$CenterX, [float]$CenterY) {
     if ($script:mode -eq 'listening') {
         foreach ($phaseOffset in @(0.0, 0.5)) {
@@ -96,32 +102,59 @@ function Draw-MicButton($Graphics, [float]$CenterX, [float]$CenterY) {
     $fillBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(10, 10, 10))
     $Graphics.FillEllipse($fillBrush, ($CenterX - 19), ($CenterY - 19), 38, 38)
 
-    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.2)
+    if ($script:micIconImage -ne $null) {
+        $oldInterpolation = $Graphics.InterpolationMode
+        $oldPixelOffset = $Graphics.PixelOffsetMode
+        $Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $iconSize = 32.0
+        $Graphics.DrawImage(
+            $script:micIconImage,
+            ($CenterX - ($iconSize / 2.0)),
+            ($CenterY - ($iconSize / 2.0)),
+            $iconSize,
+            $iconSize
+        )
+        $Graphics.InterpolationMode = $oldInterpolation
+        $Graphics.PixelOffsetMode = $oldPixelOffset
+        return
+    }
+
+    $scale = 0.72
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, (3.4 * $scale))
     $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
     $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
     $pen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
 
-    $bodyPath = New-RoundedRectPath ($CenterX - 4.6) ($CenterY - 10.0) 9.2 12.2 4.6
+    $bodyWidth = 18.0 * $scale
+    $bodyHeight = 24.0 * $scale
+    $bodyRadius = 9.0 * $scale
+    $bodyPath = New-RoundedRectPath `
+        ($CenterX - ($bodyWidth / 2.0)) `
+        ($CenterY + (-8.0 * $scale) - ($bodyHeight / 2.0)) `
+        $bodyWidth `
+        $bodyHeight `
+        $bodyRadius
     $Graphics.DrawPath($pen, $bodyPath)
 
     $supportPoints = @(
-        (New-Object System.Drawing.PointF(($CenterX - 8.6), ($CenterY - 0.8))),
-        (New-Object System.Drawing.PointF(($CenterX - 8.6), ($CenterY + 4.2))),
-        (New-Object System.Drawing.PointF(($CenterX - 6.8), ($CenterY + 7.8))),
-        (New-Object System.Drawing.PointF(($CenterX - 3.8), ($CenterY + 10.0))),
-        (New-Object System.Drawing.PointF($CenterX, ($CenterY + 10.8))),
-        (New-Object System.Drawing.PointF(($CenterX + 3.8), ($CenterY + 10.0))),
-        (New-Object System.Drawing.PointF(($CenterX + 6.8), ($CenterY + 7.8))),
-        (New-Object System.Drawing.PointF(($CenterX + 8.6), ($CenterY + 4.2))),
-        (New-Object System.Drawing.PointF(($CenterX + 8.6), ($CenterY - 0.8)))
+        (New-Object System.Drawing.PointF(($CenterX + (-11.0 * $scale)), ($CenterY + (-0.5 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (-11.0 * $scale)), ($CenterY + (5.0 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (-8.5 * $scale)), ($CenterY + (9.5 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (-4.5 * $scale)), ($CenterY + (12.5 * $scale)))),
+        (New-Object System.Drawing.PointF($CenterX, ($CenterY + (13.5 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (4.5 * $scale)), ($CenterY + (12.5 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (8.5 * $scale)), ($CenterY + (9.5 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (11.0 * $scale)), ($CenterY + (5.0 * $scale)))),
+        (New-Object System.Drawing.PointF(($CenterX + (11.0 * $scale)), ($CenterY + (-0.5 * $scale))))
     )
     $Graphics.DrawLines($pen, $supportPoints)
 
-    $stemPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.0)
+    $stemPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, (3.2 * $scale))
     $stemPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
     $stemPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $Graphics.DrawLine($stemPen, $CenterX, ($CenterY + 10.8), $CenterX, ($CenterY + 16.6))
-    $Graphics.DrawLine($stemPen, ($CenterX - 6.6), ($CenterY + 18.4), ($CenterX + 6.6), ($CenterY + 18.4))
+    $Graphics.DrawLine($stemPen, $CenterX, ($CenterY + (13.5 * $scale)), $CenterX, ($CenterY + (21.5 * $scale)))
+    $Graphics.DrawLine($stemPen, ($CenterX + (-9.0 * $scale)), ($CenterY + (24.0 * $scale)), ($CenterX + (9.0 * $scale)), ($CenterY + (24.0 * $scale)))
 }
 
 $script:fontFamily = 'Microsoft YaHei UI'

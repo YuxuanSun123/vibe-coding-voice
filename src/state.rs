@@ -20,8 +20,8 @@ pub enum InputMode {
 
 impl InputMode {
     pub const ALL: [InputMode; 6] = [
-        InputMode::CodeEdit,
         InputMode::DirectPrompt,
+        InputMode::CodeEdit,
         InputMode::BugReport,
         InputMode::CommitMessage,
         InputMode::TerminalCommand,
@@ -31,7 +31,7 @@ impl InputMode {
     pub fn label(self) -> &'static str {
         match self {
             InputMode::CodeEdit => "改代码",
-            InputMode::DirectPrompt => "直接提示词",
+            InputMode::DirectPrompt => "原文输出",
             InputMode::BugReport => "报错求助",
             InputMode::CommitMessage => "提交说明",
             InputMode::TerminalCommand => "终端命令",
@@ -97,7 +97,7 @@ impl Default for NativeAppState {
             shortcut_registered: false,
             shortcut_recording: false,
             shortcut_status: DEFAULT_SHORTCUT_STATUS.to_string(),
-            input_mode: InputMode::CodeEdit,
+            input_mode: InputMode::DirectPrompt,
             delivery_target: DeliveryTarget::Cursor,
             input_state: InputState::Idle,
             status_message: DEFAULT_STATUS_MESSAGE.to_string(),
