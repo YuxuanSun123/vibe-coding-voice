@@ -14,7 +14,7 @@ This project is in alpha. It is useful for local experimentation and daily dogfo
 
 ![Dictation flow preview](docs/assets/demo-flow.gif)
 
-The images above are documentation previews. Replace them with real screenshots or a screen recording before publishing a polished release.
+The first image shows the main app layout. The GIF is a lightweight documentation preview of the dictation flow.
 
 Currently supported:
 
