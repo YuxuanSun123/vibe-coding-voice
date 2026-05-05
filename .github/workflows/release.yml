@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build release binary
+        run: cargo build --release --bin vibe-coding-voice-native
+
+      - name: Prepare release bundle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "manual-${env:GITHUB_RUN_NUMBER}" }
+          $bundle = "vibe-coding-voice-native-windows-$version"
+          New-Item -ItemType Directory -Force -Path $bundle | Out-Null
+          Copy-Item target/release/vibe-coding-voice-native.exe $bundle/
+          Copy-Item target/release/*.dll $bundle/ -ErrorAction SilentlyContinue
+          Copy-Item recording-overlay.ps1 $bundle/
+          Copy-Item README.md $bundle/
+          Copy-Item LICENSE $bundle/
+          Copy-Item SECURITY.md $bundle/
+          Copy-Item docs/MODELS.md $bundle/
+          Compress-Archive -Path $bundle -DestinationPath "$bundle.zip" -Force
+          Get-FileHash "$bundle.zip" -Algorithm SHA256 | ForEach-Object {
+            "$($_.Hash)  $bundle.zip" | Set-Content "$bundle.zip.sha256"
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-bundle
+          path: |
+            vibe-coding-voice-native-windows-*.zip
+            vibe-coding-voice-native-windows-*.zip.sha256
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            vibe-coding-voice-native-windows-*.zip
+            vibe-coding-voice-native-windows-*.zip.sha256
+          body: |
+            ## Vibe Coding Voice Native
+
+            Windows release bundle for Vibe Coding Voice Native.
+
+            ### Notes
+
+            - Model files are not included.
+            - Read `MODELS.md` before first run.
+            - This release is created as a draft so maintainers can add screenshots, demo notes, and known issues before publishing.

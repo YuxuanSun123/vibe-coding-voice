@@ -1,117 +1,173 @@
 # Vibe Coding Voice Native
 
-一个面向 Windows 的本地优先语音输入工具，目标是让你在 Cursor、VS Code Chat、任意输入框等场景里，用全局快捷键开始口述、结束录音，并把识别结果快速投送回当前输入位置。
+Vibe Coding Voice Native is a local-first Windows voice input tool for developers. It lets you start and stop dictation with a global shortcut, transcribe speech with a local SenseVoice-compatible model, and send the result back to the active input field.
 
-当前版本基于 Rust + egui 构建，聚焦中文口述、全局快捷键、原生录音、轻量浮层和本地 SenseVoice 转写链路。
+The app is built with Rust and egui. It focuses on Chinese developer dictation, lightweight native UI, global hotkeys, local microphone capture, a recording overlay, and a SenseVoice transcription path that can run without sending audio to a remote service.
 
-## 项目定位
+## Status
 
-- 本地优先：录音、转写、界面交互尽量在本地完成
-- 面向开发者：不是通用会议转录器，而是偏向 `vibe coding` 的语音输入法
-- 原生桌面：不使用 WebView，采用 Rust 原生桌面实现
-- 快速投送：目标是把识别结果送回当前输入框，而不是停留在应用内部
+This project is in alpha. It is useful for local experimentation and daily dogfooding, but the model setup, input focus recovery, packaging, and release workflow are still being polished.
 
-## 当前功能
+## Preview
 
-- 全局快捷键开始/结束录音
-- Windows 原生主界面与设置页
-- 中文字体自动注入，避免乱码
-- 本地麦克风采集
-- SenseVoice 兼容模型探测与转写
-- 识别结果展示、复制、发送
-- 自动粘贴开关
-- 托盘常驻基础能力
-- 录音/识别状态浮层
+![Home preview](docs/assets/home-preview.png)
 
-## 技术栈
+![Dictation flow preview](docs/assets/demo-flow.gif)
 
-- `Rust`
-- `eframe` / `egui`
-- `cpal`
-- `global-hotkey`
-- `tray-icon`
-- `arboard`
-- `enigo`
-- `transcribe-rs` with `sense_voice`
-- `windows-sys`
+The images above are documentation previews. Replace them with real screenshots or a screen recording before publishing a polished release.
 
-## 项目结构
-
-```text
-.
-├─ src/
-│  ├─ app.rs
-│  ├─ hotkeys.rs
-│  ├─ main.rs
-│  ├─ sensevoice.rs
-│  ├─ services.rs
-│  ├─ state.rs
-│  └─ tray.rs
-├─ Cargo.toml
-├─ Cargo.lock
-├─ recording-overlay.ps1
-├─ run-native.ps1
-└─ README.md
-```
-
-## 运行环境
+Currently supported:
 
 - Windows
-- Rust 工具链
-- 可用的麦克风输入设备
+- Local microphone input
+- Local SenseVoice-compatible transcription
+- Global shortcut-driven recording
+- Copy and send actions for recognized text
+- Optional automatic paste into the active input field
+- Tray and recording overlay basics
+
+Not yet guaranteed:
+
+- Production-grade packaging and auto-update
+- Cross-platform support
+- Complete installer or model downloader
+- Stable extension APIs
+
+## Features
+
+- Native desktop UI built with `eframe` / `egui`
+- Global shortcut to start and finish recording
+- Local microphone capture through `cpal`
+- SenseVoice-compatible model probing and transcription through `transcribe-rs`
+- Result editor, copy button, send button, and auto-paste toggle
+- Recording and processing overlay implemented with PowerShell
+- Windows tray integration
+- Chinese font loading to avoid broken CJK rendering
+
+## Privacy And Security
+
+- Audio is intended to be processed locally by the configured model.
+- The app does not intentionally upload recordings or transcripts to a remote service.
+- Clipboard and keyboard simulation are used for copy, paste, and send workflows.
+- The recording overlay is launched through `recording-overlay.ps1`.
+- Review the source and dependencies before using this with sensitive code, credentials, or private documents.
+
+## Requirements
+
+- Windows 10 or later
+- Rust stable toolchain with edition 2024 support
 - PowerShell
+- A working microphone
+- A local SenseVoice-compatible model directory
 
-## 快速开始
+## Quick Start
 
-1. 安装 Rust 工具链
-2. 准备本地 SenseVoice 模型目录
-3. 在项目根目录执行
+Clone the repository and run the app:
 
 ```powershell
+git clone https://github.com/YuxuanSun123/vibe-coding-voice.git
+cd vibe-coding-voice
 cargo run --bin vibe-coding-voice-native
 ```
 
-如果你本地已经在项目目录维护了 `CARGO_HOME` / `RUSTUP_HOME`，也可以使用：
+You can also use the helper script:
 
 ```powershell
 .\run-native.ps1
 ```
 
-## 模型说明
-
-当前代码使用 `transcribe-rs` 的 `sense_voice` 能力，因此更适合使用兼容的 SenseVoice 导出模型。
-
-注意：
-
-- 仓库本身不包含模型文件
-- 首次运行前需要你自己准备模型目录
-- 如果模型目录结构不兼容，程序会在状态提示里给出错误信息
-
-## 开发说明
-
-常用检查：
+Run checks during development:
 
 ```powershell
+cargo fmt --check
 cargo check
+cargo clippy --all-targets -- -D warnings
 ```
 
-主要入口：
+## Model Setup
 
-- `src/main.rs`：窗口、字体与应用初始化
-- `src/app.rs`：主界面、设置页、录音区与结果区 UI
-- `src/services.rs`：录音、转写、投送、浮层联动
-- `src/hotkeys.rs`：全局快捷键注册与事件处理
-- `src/sensevoice.rs`：本地模型探测与兼容层
-- `src/state.rs`：应用状态与默认值
+The repository does not include model files. You need to prepare a local SenseVoice-compatible model yourself.
 
-## 当前状态
+See [docs/MODELS.md](docs/MODELS.md) for detailed download, directory layout, compatibility, and troubleshooting notes.
 
-- 项目仍在持续迭代
-- 当前主要面向 Windows
-- 投送目标 UI 已收敛为“当前输入框”，底层接口仍保留扩展空间
-- 浮层动效、输入焦点恢复、模型准备说明仍会继续打磨
+By default, the app looks for this sibling directory:
 
-## 免责声明
+```text
+../official-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
+```
 
-本项目仍在迭代中，请不要直接用于高风险生产场景。  
-如果你准备公开发布，建议补充许可证、第三方依赖说明和模型来源说明。
+The preferred directory shape is:
+
+```text
+official-models/
+└─ sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
+   ├─ model.int8.onnx
+   └─ tokens.txt
+```
+
+The app also has a compatibility path for older FunASR-style directories:
+
+```text
+your-model-dir/
+├─ model.onnx
+├─ config.yaml
+└─ tokens.json
+```
+
+In that case, the app attempts to generate a compatible `tokens.txt`. Some ONNX exports may still fail if they do not include the metadata required by `transcribe-rs`.
+
+Model licenses are separate from this repository's source license. Check the license and redistribution terms for any model you download or convert.
+
+## Project Structure
+
+```text
+.
+├─ src/
+│  ├─ app.rs                 # Main UI, settings page, recording panel, result panel
+│  ├─ hotkeys.rs             # Global shortcut registration and event handling
+│  ├─ main.rs                # Window, fonts, app initialization
+│  ├─ sensevoice.rs          # Model probing, compatibility helpers, transcription
+│  ├─ services.rs            # Recording, transcription, delivery, overlay orchestration
+│  ├─ state.rs               # App state and defaults
+│  └─ tray.rs                # Tray integration
+├─ recording-overlay.ps1     # Lightweight recording status overlay
+├─ run-native.ps1            # Local run helper
+├─ Cargo.toml
+├─ Cargo.lock
+└─ README.md
+```
+
+## Development Notes
+
+Important entry points:
+
+- `src/main.rs`: app bootstrap, fonts, native window configuration
+- `src/app.rs`: visual layout, controls, pages, and interaction state
+- `src/services.rs`: recording pipeline, transcription flow, and text delivery
+- `src/sensevoice.rs`: model directory detection and transcription engine loading
+- `recording-overlay.ps1`: standalone overlay process used while recording or processing
+
+Before opening a pull request, run:
+
+```powershell
+cargo fmt --check
+cargo check
+cargo clippy --all-targets -- -D warnings
+```
+
+## Roadmap
+
+- Improve release packaging for non-developer users
+- Add screenshots and short demo GIFs
+- Add clearer model setup diagnostics
+- Improve focus restoration after recording
+- Add automated release builds
+- Explore cross-platform support after the Windows workflow is stable
+
+## Contributing
+
+Contributions are welcome while the project is still young. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull requests.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

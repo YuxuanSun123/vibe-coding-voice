@@ -1,11 +1,11 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
 use transcribe_rs::{
+    TranscriptionEngine,
     engines::sense_voice::{
         Language, SenseVoiceEngine, SenseVoiceInferenceParams, SenseVoiceModelParams,
     },
-    TranscriptionEngine,
 };
 
 #[derive(Debug, Clone)]
@@ -132,7 +132,10 @@ fn load_tokens_from_json(path: &Path) -> Result<Vec<String>> {
 fn count_tokens_from_txt(path: &Path) -> Result<usize> {
     let content =
         fs::read_to_string(path).with_context(|| format!("读取 `{}` 失败。", path.display()))?;
-    Ok(content.lines().filter(|line| !line.trim().is_empty()).count())
+    Ok(content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count())
 }
 
 fn write_tokens_txt(path: &Path, tokens: &[String]) -> Result<()> {
@@ -150,8 +153,7 @@ fn write_tokens_txt(path: &Path, tokens: &[String]) -> Result<()> {
     };
 
     if should_write {
-        fs::write(path, content)
-            .with_context(|| format!("写入 `{}` 失败。", path.display()))?;
+        fs::write(path, content).with_context(|| format!("写入 `{}` 失败。", path.display()))?;
     }
 
     Ok(())
@@ -191,7 +193,10 @@ fn detect_model_params(model_dir: &Path) -> Result<SenseVoiceModelParams> {
     } else if fp32_path.exists() {
         Ok(SenseVoiceModelParams::fp32())
     } else {
-        bail!("在 `{}` 下找不到 `model.int8.onnx` 或 `model.onnx`。", model_dir.display());
+        bail!(
+            "在 `{}` 下找不到 `model.int8.onnx` 或 `model.onnx`。",
+            model_dir.display()
+        );
     }
 }
 

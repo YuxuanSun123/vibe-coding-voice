@@ -23,12 +23,8 @@ impl TrayController {
 
 fn load_tray_icon() -> Result<Icon> {
     let icon_data = build_icon_data();
-    Icon::from_rgba(
-        icon_data.rgba.clone(),
-        icon_data.width,
-        icon_data.height,
-    )
-    .context("生成托盘 RGBA 图标失败。")
+    Icon::from_rgba(icon_data.rgba.clone(), icon_data.width, icon_data.height)
+        .context("生成托盘 RGBA 图标失败。")
 }
 
 fn build_icon_data() -> IconData {

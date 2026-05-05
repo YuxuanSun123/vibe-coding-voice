@@ -31,8 +31,8 @@ struct Palette {
     card_bg: Color32,
     border: Color32,
     divider: Color32,
-    ink: Color32,        // 主操作按钮底色
-    ink_text: Color32,   // 主操作按钮文字
+    ink: Color32,      // 主操作按钮底色
+    ink_text: Color32, // 主操作按钮文字
 }
 
 impl Palette {
@@ -198,12 +198,7 @@ impl Theme {
 struct TopBar;
 
 impl TopBar {
-    fn show(
-        app: &mut VoiceInputNativeApp,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        theme: &Theme,
-    ) {
+    fn show(app: &mut VoiceInputNativeApp, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
         app.show_top_bar(ui, ctx, theme);
     }
 }
@@ -211,12 +206,7 @@ impl TopBar {
 struct RecordingPanel;
 
 impl RecordingPanel {
-    fn show(
-        app: &mut VoiceInputNativeApp,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        theme: &Theme,
-    ) {
+    fn show(app: &mut VoiceInputNativeApp, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
         app.show_recording_panel(ui, ctx, theme);
     }
 }
@@ -224,12 +214,7 @@ impl RecordingPanel {
 struct ResultPanel;
 
 impl ResultPanel {
-    fn show(
-        app: &mut VoiceInputNativeApp,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        theme: &Theme,
-    ) {
+    fn show(app: &mut VoiceInputNativeApp, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
         app.show_result_panel(ui, ctx, theme);
     }
 }
@@ -357,7 +342,10 @@ impl eframe::App for VoiceInputNativeApp {
                     + f32::from(theme.layout.panel_margin.right)
                     - theme.layout.divider_inset;
                 ui.painter().line_segment(
-                    [egui::pos2(divider_left, divider_y), egui::pos2(divider_right, divider_y)],
+                    [
+                        egui::pos2(divider_left, divider_y),
+                        egui::pos2(divider_right, divider_y),
+                    ],
                     Stroke::new(1.0, theme.palette.divider),
                 );
                 ui.add_space(theme.layout.section_gap);
@@ -391,8 +379,7 @@ impl VoiceInputNativeApp {
                 }
                 Err(error) => {
                     self.state.shortcut_registered = false;
-                    self.state.shortcut_status =
-                        format!("快捷键初始化失败，请重新设置: {error:#}");
+                    self.state.shortcut_status = format!("快捷键初始化失败，请重新设置: {error:#}");
                     self.hotkey_controller = Some(controller);
                     self.queue_error_toast(self.state.shortcut_status.clone());
                 }
@@ -426,12 +413,7 @@ impl VoiceInputNativeApp {
         }
     }
 
-    fn show_top_bar(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        theme: &Theme,
-    ) {
+    fn show_top_bar(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
         if self.current_page == AppPage::Settings {
             ui.horizontal(|ui| {
                 let back = Button::new(
@@ -473,7 +455,8 @@ impl VoiceInputNativeApp {
                     ui.horizontal(|ui| {
                         let (dot_rect, _) =
                             ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
-                        ui.painter().circle_filled(dot_rect.center(), 5.0, dot_color);
+                        ui.painter()
+                            .circle_filled(dot_rect.center(), 5.0, dot_color);
                         ui.add_space(4.0);
                         ui.label(
                             RichText::new(status_text)
@@ -486,7 +469,9 @@ impl VoiceInputNativeApp {
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let gear = Button::new(
-                        RichText::new("⚙").size(18.0).color(theme.palette.text_muted),
+                        RichText::new("⚙")
+                            .size(18.0)
+                            .color(theme.palette.text_muted),
                     )
                     .fill(Color32::TRANSPARENT)
                     .stroke(Stroke::NONE)
@@ -498,17 +483,13 @@ impl VoiceInputNativeApp {
                 });
             },
         );
-
     }
 
-    fn show_recording_panel(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        theme: &Theme,
-    ) {
+    fn show_recording_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
         let top_space = ((ui.available_height()
-            - theme.layout.recording_content_height(self.state.input_state))
+            - theme
+                .layout
+                .recording_content_height(self.state.input_state))
             * 0.5)
             .max(theme.layout.record_top_padding_min);
         ui.add_space(top_space);
@@ -527,11 +508,8 @@ impl VoiceInputNativeApp {
                 ctx.input(|input| input.time) as f32,
                 0.12,
             );
-            let active = ctx.animate_bool_with_time(
-                Id::new("record_button_active"),
-                is_recording,
-                0.18,
-            );
+            let active =
+                ctx.animate_bool_with_time(Id::new("record_button_active"), is_recording, 0.18);
             let phase = (pulse_driver * 0.85).fract();
             if active > 0.01 {
                 for offset in [0.0_f32, 0.5_f32] {
@@ -688,7 +666,9 @@ impl VoiceInputNativeApp {
                                     let key_frame = Frame::default()
                                         .fill(theme.palette.card_bg)
                                         .stroke(Stroke::new(1.0, theme.palette.border))
-                                        .corner_radius(CornerRadius::same(theme.layout.key_chip_radius))
+                                        .corner_radius(CornerRadius::same(
+                                            theme.layout.key_chip_radius,
+                                        ))
                                         .inner_margin(theme.layout.key_chip_padding);
                                     key_frame.show(ui, |ui| {
                                         ui.label(
@@ -700,7 +680,10 @@ impl VoiceInputNativeApp {
                                     });
                                 }
                                 ui.allocate_ui_with_layout(
-                                    Vec2::new(self.shortcut_text_width(ui, theme, "开始口述"), 32.0),
+                                    Vec2::new(
+                                        self.shortcut_text_width(ui, theme, "开始口述"),
+                                        32.0,
+                                    ),
                                     Layout::top_down(Align::Center),
                                     |ui| {
                                         ui.centered_and_justified(|ui| {
@@ -775,12 +758,7 @@ impl VoiceInputNativeApp {
         })
     }
 
-    fn show_result_panel(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        theme: &Theme,
-    ) {
+    fn show_result_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, theme: &Theme) {
         let divider_y = ui.max_rect().top() + theme.layout.bottom_divider_top_gap;
         let divider_left = ui.max_rect().left() - f32::from(theme.layout.result_panel_margin.left)
             + theme.layout.divider_inset;
@@ -788,7 +766,10 @@ impl VoiceInputNativeApp {
             + f32::from(theme.layout.result_panel_margin.right)
             - theme.layout.divider_inset;
         ui.painter().line_segment(
-            [egui::pos2(divider_left, divider_y), egui::pos2(divider_right, divider_y)],
+            [
+                egui::pos2(divider_left, divider_y),
+                egui::pos2(divider_right, divider_y),
+            ],
             Stroke::new(1.0, theme.palette.divider),
         );
         self.state.delivery_target = DeliveryTarget::GenericInput;
@@ -820,8 +801,7 @@ impl VoiceInputNativeApp {
                 .desired_rows(theme.layout.editor_rows)
                 .desired_width(f32::INFINITY)
                 .frame(false);
-            let response =
-                ui.add_sized([ui.available_width(), theme.layout.editor_height], editor);
+            let response = ui.add_sized([ui.available_width(), theme.layout.editor_height], editor);
             if response.changed() {
                 self.sync_hidden_delivery_text();
             }
@@ -893,18 +873,16 @@ impl VoiceInputNativeApp {
                         if ui
                             .selectable_label(self.theme == ThemeMode::Paper, "纸感米白")
                             .clicked()
+                            && self.theme != ThemeMode::Paper
                         {
-                            if self.theme != ThemeMode::Paper {
-                                self.toggle_theme();
-                            }
+                            self.toggle_theme();
                         }
                         if ui
                             .selectable_label(self.theme == ThemeMode::Ink, "深色 IDE")
                             .clicked()
+                            && self.theme != ThemeMode::Ink
                         {
-                            if self.theme != ThemeMode::Ink {
-                                self.toggle_theme();
-                            }
+                            self.toggle_theme();
                         }
                     });
 
@@ -1239,7 +1217,7 @@ impl VoiceInputNativeApp {
         theme: &Theme,
     ) {
         let time = ctx.input(|input| input.time) as f32;
-        let glow = ((time * 2.6).sin() * 0.5 + 0.5) as f32;
+        let glow = (time * 2.6).sin() * 0.5 + 0.5;
         let outer_alpha = (78.0 + glow * 52.0).round() as u8;
         let inner_alpha = (130.0 + glow * 70.0).round() as u8;
 
@@ -1269,10 +1247,8 @@ impl VoiceInputNativeApp {
     }
 
     fn paint_mic_icon(&self, painter: &egui::Painter, center: egui::Pos2, color: Color32) {
-        let body = egui::Rect::from_center_size(
-            center + egui::vec2(0.0, -8.0),
-            egui::vec2(18.0, 24.0),
-        );
+        let body =
+            egui::Rect::from_center_size(center + egui::vec2(0.0, -8.0), egui::vec2(18.0, 24.0));
         painter.rect_stroke(
             body,
             CornerRadius::same(9),
@@ -1295,11 +1271,17 @@ impl VoiceInputNativeApp {
         painter.add(egui::Shape::line(support_path, support_stroke));
 
         painter.line_segment(
-            [center + egui::vec2(0.0, 13.5), center + egui::vec2(0.0, 21.5)],
+            [
+                center + egui::vec2(0.0, 13.5),
+                center + egui::vec2(0.0, 21.5),
+            ],
             Stroke::new(3.2, color),
         );
         painter.line_segment(
-            [center + egui::vec2(-9.0, 24.0), center + egui::vec2(9.0, 24.0)],
+            [
+                center + egui::vec2(-9.0, 24.0),
+                center + egui::vec2(9.0, 24.0),
+            ],
             Stroke::new(3.2, color),
         );
     }
@@ -1318,13 +1300,11 @@ impl VoiceInputNativeApp {
                     modifiers,
                     ..
                 } => {
-                    if *key == egui::Key::Escape
+                    let is_plain_escape = *key == egui::Key::Escape
                         && !modifiers.alt
                         && !modifiers.ctrl
-                        && !modifiers.shift
-                    {
-                        Some((*key, *modifiers))
-                    } else if build_hotkey(*modifiers, *key).is_ok() {
+                        && !modifiers.shift;
+                    if is_plain_escape || build_hotkey(*modifiers, *key).is_ok() {
                         Some((*key, *modifiers))
                     } else {
                         None

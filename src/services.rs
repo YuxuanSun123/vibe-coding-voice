@@ -1,6 +1,6 @@
 use crate::sensevoice;
 use crate::state::{DeliveryTarget, InputMode, InputState, NativeAppState};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, Stream, StreamConfig};
@@ -116,7 +116,8 @@ pub fn run_practice_flow(state: &mut NativeAppState) {
 
     state.raw_text = normalize_text(&state.practice_text);
     state.delivered_text = transform_text(state.input_mode, &state.raw_text);
-    let delivery_message = deliver_output(state).unwrap_or_else(|error| format!("投送失败: {error:#}"));
+    let delivery_message =
+        deliver_output(state).unwrap_or_else(|error| format!("投送失败: {error:#}"));
     state.input_state = InputState::Success;
     state.status_message = format!(
         "原生输入法演练已完成，目标为 {}。{}",
@@ -135,8 +136,7 @@ pub fn begin_input(state: &mut NativeAppState) {
                 state.status_message = format!("录音已开始，但浮层启动失败: {error:#}");
             } else {
                 state.status_message =
-                    "已经开始真实录音。说完后再次按快捷键或点“结束并发送”即可完成。"
-                        .to_string();
+                    "已经开始真实录音。说完后再次按快捷键或点“结束并发送”即可完成。".to_string();
             }
         }
         Err(error) => {
@@ -205,7 +205,8 @@ pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
 
     let result = (|| -> Result<(String, String, usize, String)> {
         if !local_model_ready {
-            let probe = sensevoice::prepare_and_probe(std::path::Path::new(&snapshot.local_model_dir))?;
+            let probe =
+                sensevoice::prepare_and_probe(std::path::Path::new(&snapshot.local_model_dir))?;
             local_model_ready = true;
             local_model_status = "SenseVoice 已可被 Rust provider 加载。".to_string();
             local_model_summary = sensevoice::format_probe_summary(&probe);
@@ -217,8 +218,7 @@ pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
         )?;
         let raw_text = normalize_text(&transcript.text);
         let delivered_text = transform_text(snapshot.input_mode, &raw_text);
-        let delivery_message =
-            deliver_output_from_snapshot(&snapshot, delivered_text.trim())?;
+        let delivery_message = deliver_output_from_snapshot(&snapshot, delivered_text.trim())?;
         Ok((
             raw_text,
             delivered_text,
@@ -310,7 +310,13 @@ fn start_recording() -> Result<String> {
 
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let error_label = device_name.clone();
-    let stream = build_input_stream(&device, &config, sample_format, Arc::clone(&buffer), error_label)?;
+    let stream = build_input_stream(
+        &device,
+        &config,
+        sample_format,
+        Arc::clone(&buffer),
+        error_label,
+    )?;
     stream.play().context("启动麦克风采集失败。")?;
     remember_delivery_target_window();
 
@@ -376,8 +382,10 @@ fn build_input_stream(
             .build_input_stream(
                 config,
                 move |data: &[i16], _| {
-                    let converted: Vec<f32> =
-                        data.iter().map(|sample| *sample as f32 / i16::MAX as f32).collect();
+                    let converted: Vec<f32> = data
+                        .iter()
+                        .map(|sample| *sample as f32 / i16::MAX as f32)
+                        .collect();
                     push_samples_f32(&buffer, &converted);
                 },
                 err_fn,
@@ -494,7 +502,10 @@ fn deliver_output_from_snapshot(snapshot: &FinishInputSnapshot, text: &str) -> R
             write_clipboard(text)?;
             focus_delivery_target_window();
             simulate_paste_shortcut()?;
-            Ok(format!("已复制到剪贴板，并尝试粘贴到 {}。", snapshot.delivery_target.label()))
+            Ok(format!(
+                "已复制到剪贴板，并尝试粘贴到 {}。",
+                snapshot.delivery_target.label()
+            ))
         }
     }
 }
@@ -578,7 +589,8 @@ fn ensure_overlay_host_running() -> Result<()> {
         }
 
         *guard = None;
-        let overlay_script = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recording-overlay.ps1");
+        let overlay_script =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recording-overlay.ps1");
         let state_file = overlay_state_path();
         let child = Command::new("powershell.exe")
             .arg("-NoProfile")
@@ -604,11 +616,11 @@ fn ensure_overlay_host_running() -> Result<()> {
 fn close_stale_overlay_host() {
     #[cfg(target_os = "windows")]
     {
-        if let Ok(mut guard) = overlay_slot().lock() {
-            if let Some(mut child) = guard.take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+        if let Ok(mut guard) = overlay_slot().lock()
+            && let Some(mut child) = guard.take()
+        {
+            let _ = child.kill();
+            let _ = child.wait();
         }
 
         let title: Vec<u16> = "Vibe Coding Voice Overlay"
@@ -655,9 +667,8 @@ fn flush_overlay_state(state: &OverlayUiState) -> Result<()> {
             "level": state.level,
             "started_at_ms": state.started_at_ms,
         });
-        fs::write(&path, payload.to_string()).with_context(|| {
-            format!("写入录音浮层状态失败: {}", path.display())
-        })?;
+        fs::write(&path, payload.to_string())
+            .with_context(|| format!("写入录音浮层状态失败: {}", path.display()))?;
         Ok(())
     }
 }
@@ -682,10 +693,10 @@ fn update_overlay_level(level: f32) {
         guard.level = (guard.level * 0.7 + level * 0.3).clamp(0.0, 1.0);
 
         let now = Instant::now();
-        if let Some(last) = guard.last_level_flush {
-            if now.duration_since(last) < Duration::from_millis(50) {
-                return;
-            }
+        if let Some(last) = guard.last_level_flush
+            && now.duration_since(last) < Duration::from_millis(50)
+        {
+            return;
         }
         guard.last_level_flush = Some(now);
         let _ = flush_overlay_state(&guard);
@@ -712,10 +723,10 @@ fn remember_delivery_target_window() {
     #[cfg(target_os = "windows")]
     {
         let hwnd = unsafe { GetForegroundWindow() };
-        if hwnd != std::ptr::null_mut() {
-            if let Ok(mut guard) = delivery_target_slot().lock() {
-                *guard = Some(hwnd as isize);
-            }
+        if !hwnd.is_null()
+            && let Ok(mut guard) = delivery_target_slot().lock()
+        {
+            *guard = Some(hwnd as isize);
         }
     }
 }
@@ -723,10 +734,7 @@ fn remember_delivery_target_window() {
 fn focus_delivery_target_window() {
     #[cfg(target_os = "windows")]
     {
-        let hwnd = delivery_target_slot()
-            .lock()
-            .ok()
-            .and_then(|guard| *guard);
+        let hwnd = delivery_target_slot().lock().ok().and_then(|guard| *guard);
         if let Some(hwnd) = hwnd {
             unsafe {
                 let _ = SetForegroundWindow(hwnd as _);
@@ -747,9 +755,15 @@ fn transform_text(mode: InputMode, input: &str) -> String {
         ]
         .join("\n"),
         InputMode::DirectPrompt => input.to_string(),
-        InputMode::BugReport => {
-            ["问题描述:", input, "", "复现步骤:", "1. 待补充", "2. 待补充"].join("\n")
-        }
+        InputMode::BugReport => [
+            "问题描述:",
+            input,
+            "",
+            "复现步骤:",
+            "1. 待补充",
+            "2. 待补充",
+        ]
+        .join("\n"),
         InputMode::CommitMessage => format!("feat: {input}"),
         InputMode::TerminalCommand => [
             "请生成或说明终端命令，要求如下:",

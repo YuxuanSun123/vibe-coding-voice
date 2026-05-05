@@ -3,8 +3,7 @@ use crate::sensevoice;
 const DEFAULT_SHORTCUT: &str = "ctrl+z";
 const DEFAULT_SHORTCUT_STATUS: &str = "快捷键尚未注册。";
 const DEFAULT_STATUS_MESSAGE: &str = "原生输入法已启动，下一步接全局快捷键、录音和自动投送。";
-const DEFAULT_PRACTICE_TEXT: &str =
-    "帮我把这个登录流程加上 refresh token，并补齐错误处理和测试。";
+const DEFAULT_PRACTICE_TEXT: &str = "帮我把这个登录流程加上 refresh token，并补齐错误处理和测试。";
 const DEFAULT_MODEL_STATUS: &str = "尚未检查 SenseVoice 本地模型。";
 const DEFAULT_MODEL_SUMMARY: &str = "当前默认指向官方 sherpa-onnx SenseVoice int8 目录；如果你切回旧 FunASR 风格目录，程序也会尝试把 `tokens.json` 转成 `tokens.txt` 再探测加载。";
 const DEFAULT_RECORDING_INFO: &str = "尚未开始真实录音。";

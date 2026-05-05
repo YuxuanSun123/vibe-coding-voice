@@ -1,4 +1,18 @@
-/target
-/target-live
-target-live/
+/target/
+/target-live/
+/.cargo-home/
+/.rustup-home/
+
+.env
+.env.*
+*.log
 *.swp
+
+# Local model and audio artifacts should not be committed.
+/official-models/
+/models/
+*.onnx
+*.wav
+*.mp3
+*.flac
+*.m4a

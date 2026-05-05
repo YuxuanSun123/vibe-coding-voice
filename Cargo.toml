@@ -2,6 +2,13 @@
 name = "vibe-coding-voice-native"
 version = "0.1.0"
 edition = "2024"
+authors = ["Yuxuan Sun"]
+description = "Local-first Windows voice input tool for vibe coding."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/YuxuanSun123/vibe-coding-voice"
+keywords = ["voice-input", "egui", "sensevoice", "windows"]
+categories = ["gui", "multimedia::audio"]
 
 [dependencies]
 anyhow = "1"
