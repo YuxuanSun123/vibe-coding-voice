@@ -1,5 +1,6 @@
+use crate::qwen_asr::{self, QwenAsrConfig};
 use crate::sensevoice;
-use crate::state::{DeliveryTarget, InputMode, InputState, NativeAppState};
+use crate::state::{DeliveryTarget, InputMode, InputState, ModelProvider, NativeAppState};
 use anyhow::{Context, Result, anyhow};
 use arboard::Clipboard;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -39,10 +40,17 @@ pub struct FinishInputSnapshot {
     input_mode: InputMode,
     delivery_target: DeliveryTarget,
     auto_paste: bool,
+    model_provider: ModelProvider,
     local_model_dir: String,
     local_model_ready: bool,
     local_model_status: String,
     local_model_summary: String,
+    qwen_api_key: String,
+    qwen_model: String,
+    qwen_url: String,
+    qwen_language: String,
+    qwen_ready: bool,
+    qwen_status: String,
 }
 
 pub struct FinishInputWork {
@@ -59,6 +67,8 @@ pub struct FinishInputResult {
     pub local_model_ready: bool,
     pub local_model_status: String,
     pub local_model_summary: String,
+    pub qwen_ready: bool,
+    pub qwen_status: String,
     pub last_recording_info: String,
 }
 
@@ -184,10 +194,17 @@ pub fn begin_finish_input(state: &mut NativeAppState) -> Result<FinishInputWork>
             input_mode: state.input_mode,
             delivery_target: state.delivery_target,
             auto_paste: state.auto_paste,
+            model_provider: state.model_provider,
             local_model_dir: state.local_model_dir.clone(),
             local_model_ready: state.local_model_ready,
             local_model_status: state.local_model_status.clone(),
             local_model_summary: state.local_model_summary.clone(),
+            qwen_api_key: state.qwen_api_key.clone(),
+            qwen_model: state.qwen_model.clone(),
+            qwen_url: state.qwen_url.clone(),
+            qwen_language: state.qwen_language.clone(),
+            qwen_ready: state.qwen_ready,
+            qwen_status: state.qwen_status.clone(),
         },
     })
 }
@@ -202,8 +219,22 @@ pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
     let mut local_model_ready = snapshot.local_model_ready;
     let mut local_model_status = snapshot.local_model_status.clone();
     let mut local_model_summary = snapshot.local_model_summary.clone();
+    let mut qwen_ready = snapshot.qwen_ready;
+    let mut qwen_status = snapshot.qwen_status.clone();
 
     let result = (|| -> Result<(String, String, usize, String)> {
+        if snapshot.model_provider == ModelProvider::OnlineQwen {
+            let config = qwen_config_from_snapshot(&snapshot);
+            qwen_asr::validate_config(&config)?;
+            qwen_ready = true;
+            qwen_status = format!("Qwen-ASR Realtime 已配置: {}", config.model);
+            let transcript = qwen_asr::transcribe_audio(&config, normalized_samples)?;
+            let raw_text = normalize_text(&transcript.text);
+            let delivered_text = transform_text(snapshot.input_mode, &raw_text);
+            let delivery_message = deliver_output_from_snapshot(&snapshot, delivered_text.trim())?;
+            return Ok((raw_text, delivered_text, 1, delivery_message));
+        }
+
         if !local_model_ready {
             let probe =
                 sensevoice::prepare_and_probe(std::path::Path::new(&snapshot.local_model_dir))?;
@@ -230,10 +261,14 @@ pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
     match result {
         Ok((raw_text, delivered_text, segments, delivery_message)) => {
             hide_recording_overlay();
+            let engine_label = match snapshot.model_provider {
+                ModelProvider::Local => "SenseVoice",
+                ModelProvider::OnlineQwen => "Qwen-ASR",
+            };
             FinishInputResult {
                 input_state: InputState::Success,
                 status_message: format!(
-                    "SenseVoice 转写完成，已识别 {} 个字符，切出了 {} 段。{}",
+                    "{engine_label} 转写完成，已识别 {} 个字符，切出 {} 段。{}",
                     raw_text.chars().count(),
                     segments,
                     delivery_message
@@ -243,6 +278,8 @@ pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
                 local_model_ready,
                 local_model_status,
                 local_model_summary,
+                qwen_ready,
+                qwen_status,
                 last_recording_info,
             }
         }
@@ -250,14 +287,20 @@ pub fn run_finish_input_work(work: FinishInputWork) -> FinishInputResult {
             let _ = show_recording_overlay("error");
             thread::sleep(std::time::Duration::from_millis(900));
             hide_recording_overlay();
+            let engine_label = match snapshot.model_provider {
+                ModelProvider::Local => "SenseVoice",
+                ModelProvider::OnlineQwen => "Qwen-ASR",
+            };
             FinishInputResult {
                 input_state: InputState::Error,
-                status_message: format!("SenseVoice 转写失败: {error:#}"),
+                status_message: format!("{engine_label} 转写失败: {error:#}"),
                 raw_text: None,
                 delivered_text: None,
                 local_model_ready,
                 local_model_status,
                 local_model_summary,
+                qwen_ready,
+                qwen_status,
                 last_recording_info,
             }
         }
@@ -284,6 +327,40 @@ pub fn check_local_model(state: &mut NativeAppState) {
             state.status_message =
                 "SenseVoice 本地模型暂时不可用，请先看下方错误信息。".to_string();
         }
+    }
+}
+
+pub fn check_online_model(state: &mut NativeAppState) {
+    let config = QwenAsrConfig {
+        api_key: state.qwen_api_key.clone(),
+        model: state.qwen_model.clone(),
+        url: state.qwen_url.clone(),
+        language: state.qwen_language.clone(),
+    };
+
+    match qwen_asr::validate_config(&config) {
+        Ok(()) => {
+            state.qwen_ready = true;
+            state.qwen_status = format!("Qwen-ASR Realtime 已配置: {}", config.model);
+            state.status_message =
+                "在线模型配置已就绪，录音结束后将调用 Qwen-ASR Realtime。".to_string();
+        }
+        Err(error) => {
+            state.qwen_ready = false;
+            state.qwen_status = format!("Qwen-ASR 配置不完整: {error:#}");
+            state.input_state = InputState::Error;
+            state.status_message =
+                "在线模型暂时不可用，请检查 API Key、模型名和 WebSocket 地址。".to_string();
+        }
+    }
+}
+
+fn qwen_config_from_snapshot(snapshot: &FinishInputSnapshot) -> QwenAsrConfig {
+    QwenAsrConfig {
+        api_key: snapshot.qwen_api_key.clone(),
+        model: snapshot.qwen_model.clone(),
+        url: snapshot.qwen_url.clone(),
+        language: snapshot.qwen_language.clone(),
     }
 }
 
@@ -471,10 +548,17 @@ fn deliver_output(state: &NativeAppState) -> Result<String> {
             input_mode: state.input_mode,
             delivery_target: state.delivery_target,
             auto_paste: state.auto_paste,
+            model_provider: state.model_provider,
             local_model_dir: state.local_model_dir.clone(),
             local_model_ready: state.local_model_ready,
             local_model_status: state.local_model_status.clone(),
             local_model_summary: state.local_model_summary.clone(),
+            qwen_api_key: state.qwen_api_key.clone(),
+            qwen_model: state.qwen_model.clone(),
+            qwen_url: state.qwen_url.clone(),
+            qwen_language: state.qwen_language.clone(),
+            qwen_ready: state.qwen_ready,
+            qwen_status: state.qwen_status.clone(),
         },
         state.delivered_text.trim(),
     )

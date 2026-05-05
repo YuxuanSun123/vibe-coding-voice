@@ -2,7 +2,7 @@
 
 Vibe Coding Voice Native 不随仓库打包语音识别模型。你需要自行下载 SenseVoice 兼容模型，并在应用设置里指向本地模型目录。
 
-当前公开版本只启用了 SenseVoice 兼容路径。Whisper.cpp 和 Qwen3-ASR 暂未在界面和运行时启用。
+当前公开版本支持本地 SenseVoice 兼容路径和在线 Qwen-ASR Realtime 路径。Whisper.cpp 暂未在界面和运行时启用。
 
 ## 推荐模型
 

@@ -1,5 +1,6 @@
 mod app;
 mod hotkeys;
+mod qwen_asr;
 mod sensevoice;
 mod services;
 mod state;

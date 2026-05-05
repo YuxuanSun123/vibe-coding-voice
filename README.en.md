@@ -23,6 +23,7 @@ The first image shows the main app layout. The GIF is a lightweight documentatio
 - Windows 10 or later
 - Local microphone input
 - Local SenseVoice-compatible transcription
+- Online Qwen-ASR Realtime transcription
 - Global shortcut-driven recording
 - Two output modes: original text and code-edit prompt
 - Copy and send actions for recognized text
@@ -36,9 +37,9 @@ The first image shows the main app layout. The GIF is a lightweight documentatio
 - Cross-platform support
 - Complete installer or in-app model downloader
 - Stable extension APIs
-- Whisper.cpp or Qwen3-ASR backends
+- Local Whisper.cpp backend
 
-Experimental work on additional ASR backends may happen later, but the current public build only supports the SenseVoice-compatible local model path.
+Experimental work on additional ASR backends may happen later. The current public build supports a local SenseVoice-compatible model path and an online Qwen-ASR Realtime path.
 
 ## Features
 
@@ -53,8 +54,8 @@ Experimental work on additional ASR backends may happen later, but the current p
 
 ## Privacy And Security
 
-- Audio is intended to be processed locally by the configured model.
-- The app does not intentionally upload recordings or transcripts to a remote service.
+- In local mode, audio is intended to be processed locally by the configured model.
+- In online mode, recorded audio is sent to the configured DashScope/Qwen-ASR Realtime service.
 - Clipboard and keyboard simulation are used for copy, paste, and send workflows.
 - The recording overlay is launched through `recording-overlay.ps1`.
 - Review the source, dependencies, and model license before using this with sensitive code, credentials, or private documents.
@@ -66,6 +67,7 @@ Experimental work on additional ASR backends may happen later, but the current p
 - PowerShell
 - A working microphone
 - A local SenseVoice-compatible model directory
+- A DashScope API Key if you use the online model path
 
 ## Quick Start
 
@@ -136,6 +138,17 @@ Then open the app:
 4. Return to the home page and start recording.
 
 See [docs/MODELS.md](docs/MODELS.md) for detailed download, directory layout, compatibility, and troubleshooting notes.
+
+## Online Model
+
+The settings page can switch between `本地模型` and `在线模型`. For the online path, configure:
+
+- DashScope API Key
+- Model name, default `qwen3-asr-flash-realtime`
+- WebSocket URL, default `wss://dashscope.aliyuncs.com/api-ws/v1/realtime`
+- Language, default `zh`
+
+The online path uses Qwen-ASR Realtime in Manual mode. After recording finishes, the app sends 16 kHz PCM audio over WebSocket, waits for the final transcript, and then copies or delivers the resulting text.
 
 ## Model Licenses
 

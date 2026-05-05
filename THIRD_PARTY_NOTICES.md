@@ -14,6 +14,8 @@ This project depends on open-source Rust crates listed in `Cargo.toml` and locke
 - `eframe` / `egui` for the native UI
 - `cpal` for microphone capture
 - `transcribe-rs` for the SenseVoice transcription path
+- `ort` and ONNX Runtime binaries for local ONNX model execution
+- `tungstenite`, `native-tls`, and `base64` for the Qwen-ASR Realtime WebSocket path
 - `global-hotkey` for global shortcut registration
 - `tray-icon` for Windows tray integration
 - `arboard` and `enigo` for clipboard and keyboard delivery workflows
@@ -49,6 +51,10 @@ Before using, redistributing, or bundling any model, review that model's license
 - whether redistribution is permitted
 - whether attribution is required
 - whether converted or quantized artifacts can be shared
+
+## Online Speech Recognition Services
+
+When users choose the online Qwen-ASR Realtime path, audio is sent to the configured DashScope WebSocket endpoint. Users are responsible for their own API key, account terms, service region, data handling requirements, and usage costs.
 
 ## Not Bundled
 

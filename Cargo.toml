@@ -13,12 +13,16 @@ categories = ["gui", "multimedia::audio"]
 [dependencies]
 anyhow = "1"
 arboard = "3"
+base64 = "0.22"
 cpal = "0.16"
 eframe = "0.31"
 egui = "0.31"
 enigo = "0.2"
 global-hotkey = "0.7"
+native-tls = "0.2"
+ort = { version = "=2.0.0-rc.10", features = ["download-binaries"] }
 serde_json = "1"
+tungstenite = { version = "0.26", features = ["native-tls"] }
 tray-icon = "0.21"
 transcribe-rs = { version = "=0.2.9", features = ["sense_voice"] }
 windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging"] }

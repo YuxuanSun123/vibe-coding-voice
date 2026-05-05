@@ -1,9 +1,9 @@
 use crate::hotkeys::{HotkeyController, build_hotkey, install_event_handler};
 use crate::services::{
-    FinishInputResult, begin_finish_input, begin_input, check_local_model,
+    FinishInputResult, begin_finish_input, begin_input, check_local_model, check_online_model,
     prepare_recording_overlay_host, run_finish_input_work, run_practice_flow,
 };
-use crate::state::{DeliveryTarget, InputMode, InputState, NativeAppState};
+use crate::state::{DeliveryTarget, InputMode, InputState, ModelProvider, NativeAppState};
 use crate::tray::TrayController;
 use arboard::Clipboard;
 use eframe::egui::{
@@ -946,6 +946,23 @@ impl VoiceInputNativeApp {
                     );
 
                     ui.separator();
+                    ui.label(RichText::new("模型来源").size(14.0).strong());
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        for provider in ModelProvider::ALL {
+                            if ui
+                                .selectable_label(
+                                    self.state.model_provider == provider,
+                                    provider.label(),
+                                )
+                                .clicked()
+                            {
+                                self.state.model_provider = provider;
+                            }
+                        }
+                    });
+                    ui.add_space(6.0);
+
                     ui.label(RichText::new("本地模型").size(14.0).strong());
                     ui.add_space(4.0);
 
@@ -1014,6 +1031,80 @@ impl VoiceInputNativeApp {
                             .color(theme.palette.text_muted),
                     );
                     ui.label(RichText::new(&self.state.local_model_summary).size(12.0));
+
+                    ui.separator();
+                    ui.label(RichText::new("在线模型").size(14.0).strong());
+                    ui.add_space(4.0);
+
+                    ui.label(
+                        RichText::new("DashScope API Key")
+                            .size(12.0)
+                            .color(theme.palette.text_muted),
+                    );
+                    ui.add_sized(
+                        Vec2::new(ui.available_width(), 28.0),
+                        TextEdit::singleline(&mut self.state.qwen_api_key).password(true),
+                    );
+                    ui.add_space(6.0);
+
+                    ui.label(
+                        RichText::new("模型名")
+                            .size(12.0)
+                            .color(theme.palette.text_muted),
+                    );
+                    ui.add_sized(
+                        Vec2::new(ui.available_width(), 28.0),
+                        TextEdit::singleline(&mut self.state.qwen_model),
+                    );
+                    ui.add_space(6.0);
+
+                    ui.label(
+                        RichText::new("WebSocket 地址")
+                            .size(12.0)
+                            .color(theme.palette.text_muted),
+                    );
+                    ui.add_sized(
+                        Vec2::new(ui.available_width(), 28.0),
+                        TextEdit::singleline(&mut self.state.qwen_url),
+                    );
+                    ui.add_space(6.0);
+
+                    ui.label(
+                        RichText::new("语种")
+                            .size(12.0)
+                            .color(theme.palette.text_muted),
+                    );
+                    ui.add_sized(
+                        Vec2::new(120.0, 28.0),
+                        TextEdit::singleline(&mut self.state.qwen_language),
+                    );
+                    ui.add_space(6.0);
+
+                    if ui.button("检查在线配置").clicked() {
+                        check_online_model(&mut self.state);
+                        if !self.state.qwen_ready {
+                            self.show_toast_now(
+                                ctx,
+                                ToastKind::Error,
+                                self.state.qwen_status.clone(),
+                            );
+                        }
+                    }
+                    ui.add_space(6.0);
+                    ui.label(
+                        RichText::new(if self.state.qwen_ready {
+                            "在线模型已就绪"
+                        } else {
+                            "在线模型未就绪"
+                        })
+                        .size(12.0)
+                        .color(if self.state.qwen_ready {
+                            theme.palette.success
+                        } else {
+                            theme.palette.accent
+                        }),
+                    );
+                    ui.label(RichText::new(&self.state.qwen_status).size(12.0));
                 });
         });
     }
@@ -1210,6 +1301,8 @@ impl VoiceInputNativeApp {
         self.state.local_model_ready = result.local_model_ready;
         self.state.local_model_status = result.local_model_status;
         self.state.local_model_summary = result.local_model_summary;
+        self.state.qwen_ready = result.qwen_ready;
+        self.state.qwen_status = result.qwen_status;
         self.state.last_recording_info = result.last_recording_info;
 
         if let Some(raw_text) = result.raw_text {

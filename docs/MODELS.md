@@ -2,7 +2,7 @@
 
 Vibe Coding Voice Native does not bundle speech recognition models. You need to download a SenseVoice-compatible model yourself and point the app to that local directory.
 
-The current public app supports the SenseVoice-compatible path only. Whisper.cpp and Qwen3-ASR are not enabled in the UI or runtime yet.
+The current public app supports a local SenseVoice-compatible path and an online Qwen-ASR Realtime path. Whisper.cpp is not enabled in the UI or runtime yet.
 
 ## Recommended Model
 

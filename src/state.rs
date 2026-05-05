@@ -1,5 +1,10 @@
 use crate::sensevoice;
 
+const DEFAULT_QWEN_MODEL: &str = "qwen3-asr-flash-realtime";
+const DEFAULT_QWEN_URL: &str = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime";
+const DEFAULT_QWEN_LANGUAGE: &str = "zh";
+const DEFAULT_QWEN_STATUS: &str = "尚未配置 Qwen-ASR Realtime。";
+
 const DEFAULT_SHORTCUT: &str = "ctrl+z";
 const DEFAULT_SHORTCUT_STATUS: &str = "快捷键尚未注册。";
 const DEFAULT_STATUS_MESSAGE: &str = "原生输入法已启动，下一步接全局快捷键、录音和自动投送。";
@@ -21,6 +26,23 @@ impl InputMode {
         match self {
             InputMode::CodeEdit => "改代码",
             InputMode::DirectPrompt => "原文输出",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelProvider {
+    Local,
+    OnlineQwen,
+}
+
+impl ModelProvider {
+    pub const ALL: [ModelProvider; 2] = [ModelProvider::Local, ModelProvider::OnlineQwen];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ModelProvider::Local => "本地模型",
+            ModelProvider::OnlineQwen => "在线模型",
         }
     }
 }
@@ -68,10 +90,17 @@ pub struct NativeAppState {
     pub delivered_text: String,
     pub practice_text: String,
     pub auto_paste: bool,
+    pub model_provider: ModelProvider,
     pub local_model_dir: String,
     pub local_model_ready: bool,
     pub local_model_status: String,
     pub local_model_summary: String,
+    pub qwen_api_key: String,
+    pub qwen_model: String,
+    pub qwen_url: String,
+    pub qwen_language: String,
+    pub qwen_ready: bool,
+    pub qwen_status: String,
     pub last_recording_info: String,
 }
 
@@ -90,12 +119,19 @@ impl Default for NativeAppState {
             delivered_text: String::new(),
             practice_text: DEFAULT_PRACTICE_TEXT.to_string(),
             auto_paste: true,
+            model_provider: ModelProvider::Local,
             local_model_dir: sensevoice::default_model_dir()
                 .to_string_lossy()
                 .into_owned(),
             local_model_ready: false,
             local_model_status: DEFAULT_MODEL_STATUS.to_string(),
             local_model_summary: DEFAULT_MODEL_SUMMARY.to_string(),
+            qwen_api_key: String::new(),
+            qwen_model: DEFAULT_QWEN_MODEL.to_string(),
+            qwen_url: DEFAULT_QWEN_URL.to_string(),
+            qwen_language: DEFAULT_QWEN_LANGUAGE.to_string(),
+            qwen_ready: false,
+            qwen_status: DEFAULT_QWEN_STATUS.to_string(),
             last_recording_info: DEFAULT_RECORDING_INFO.to_string(),
         }
     }
