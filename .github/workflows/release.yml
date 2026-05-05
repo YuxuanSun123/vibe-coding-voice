@@ -44,7 +44,7 @@ jobs:
           Copy-Item assets $bundle/assets -Recurse
           Copy-Item recording-overlay.ps1 $bundle/
           Copy-Item README.md $bundle/
-          Copy-Item README.zh-CN.md $bundle/
+          Copy-Item README.en.md $bundle/
           Copy-Item LICENSE $bundle/
           Copy-Item SECURITY.md $bundle/
           Copy-Item THIRD_PARTY_NOTICES.md $bundle/
@@ -79,5 +79,5 @@ jobs:
             ### Notes
 
             - Model files are not included.
-            - Read `MODELS.md` before first run.
+            - Read `README.md` and `MODELS.zh-CN.md` before first run.
             - This release is created as a draft so maintainers can add screenshots, demo notes, and known issues before publishing.

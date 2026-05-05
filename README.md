@@ -1,75 +1,75 @@
 # Vibe Coding Voice Native
 
-[简体中文说明](README.zh-CN.md)
+[English README](README.en.md)
 
-Vibe Coding Voice Native is a local-first Windows voice input tool for developers. It records speech from your microphone, transcribes it with a local SenseVoice-compatible model, and sends the result back to the active input field.
+Vibe Coding Voice Native 是一个面向开发者的 Windows 本地语音输入工具。它可以从麦克风录音，使用本地 SenseVoice 兼容模型转写语音，然后把识别结果复制或发送到当前输入框。
 
-The app is built with Rust and egui. It is designed around Chinese and mixed Chinese/English developer dictation, global hotkeys, a small native UI, local microphone capture, a recording overlay, and a local transcription path that does not intentionally upload audio to a remote service.
+这个项目使用 Rust 和 egui 构建，重点服务中文以及中英混合的编程口述场景。它支持全局快捷键、本地麦克风采集、轻量原生界面、录音状态浮窗，以及不主动上传音频到远端服务的本地转写流程。
 
-## Status
+## 当前状态
 
-This project is in alpha. It is useful for local experimentation and daily dogfooding, but model setup, input focus recovery, packaging, and release workflow are still being polished.
+项目目前处于 alpha 阶段。它已经可以用于本地试用和日常自用，但模型配置、焦点恢复、安装包和发布流程还在继续完善。
 
-## Preview
+## 预览
 
-![Home preview](docs/assets/home-preview.png)
+![主页预览](docs/assets/home-preview.png)
 
-![Dictation flow preview](docs/assets/demo-flow.gif)
+![口述流程预览](docs/assets/demo-flow.gif)
 
-The first image shows the main app layout. The GIF is a lightweight documentation preview of the dictation flow.
+第一张图是主界面，GIF 展示了基本口述流程。
 
-## Currently Supported
+## 已支持
 
-- Windows 10 or later
-- Local microphone input
-- Local SenseVoice-compatible transcription
-- Global shortcut-driven recording
-- Two output modes: original text and code-edit prompt
-- Copy and send actions for recognized text
-- Optional automatic paste into the active input field
-- Tray and recording overlay basics
-- Manual local model directory selection from the settings page
+- Windows 10 或更高版本
+- 本地麦克风输入
+- 本地 SenseVoice 兼容模型转写
+- 全局快捷键开始和结束录音
+- 两种输出模式：原文输出、改代码提示词
+- 识别结果复制和发送
+- 可选的识别后自动粘贴
+- 托盘和录音浮窗基础能力
+- 在设置页手动选择本地模型目录
 
-## Not Yet Guaranteed
+## 暂不保证
 
-- Production-grade packaging and auto-update
-- Cross-platform support
-- Complete installer or in-app model downloader
-- Stable extension APIs
-- Whisper.cpp or Qwen3-ASR backends
+- 面向普通用户的完整安装包和自动更新
+- 跨平台支持
+- 内置模型下载器
+- 稳定的扩展 API
+- Whisper.cpp 或 Qwen3-ASR 后端
 
-Experimental work on additional ASR backends may happen later, but the current public build only supports the SenseVoice-compatible local model path.
+后续可能继续探索其他 ASR 后端，但当前公开版本只支持 SenseVoice 兼容的本地模型路径。
 
-## Features
+## 功能特点
 
-- Native desktop UI built with `eframe` / `egui`
-- Global shortcut to start and finish recording
-- Local microphone capture through `cpal`
-- SenseVoice-compatible model probing and transcription through `transcribe-rs`
-- Result editor, copy button, send button, and auto-paste toggle
-- Recording and processing overlay implemented with PowerShell
-- Windows tray integration
-- Chinese font loading to avoid broken CJK rendering
+- 基于 `eframe` / `egui` 的原生桌面界面
+- 使用全局快捷键控制录音
+- 通过 `cpal` 采集本地麦克风音频
+- 通过 `transcribe-rs` 接入 SenseVoice 兼容转写
+- 内置结果编辑框、复制、发送、自动粘贴开关
+- 使用 PowerShell 实现录音和处理中浮窗
+- Windows 托盘集成
+- 加载中文字体，避免中文界面显示异常
 
-## Privacy And Security
+## 隐私与安全
 
-- Audio is intended to be processed locally by the configured model.
-- The app does not intentionally upload recordings or transcripts to a remote service.
-- Clipboard and keyboard simulation are used for copy, paste, and send workflows.
-- The recording overlay is launched through `recording-overlay.ps1`.
-- Review the source, dependencies, and model license before using this with sensitive code, credentials, or private documents.
+- 音频设计上由你配置的本地模型处理。
+- 应用不会主动把录音或识别文本上传到远端服务。
+- 复制、粘贴、发送会使用剪贴板和键盘模拟能力。
+- 录音浮窗通过 `recording-overlay.ps1` 启动。
+- 如果要处理敏感代码、凭据或私密文档，请先审查源码、依赖和模型许可证。
 
-## Requirements
+## 环境要求
 
-- Windows 10 or later
-- Rust stable toolchain with edition 2024 support
+- Windows 10 或更高版本
+- 支持 Rust 2024 edition 的稳定 Rust 工具链
 - PowerShell
-- A working microphone
-- A local SenseVoice-compatible model directory
+- 可用麦克风
+- 本地 SenseVoice 兼容模型目录
 
-## Quick Start
+## 快速开始
 
-Clone the repository and run the app:
+克隆仓库并运行：
 
 ```powershell
 git clone https://github.com/YuxuanSun123/vibe-coding-voice.git
@@ -77,48 +77,49 @@ cd vibe-coding-voice
 cargo run --bin vibe-coding-voice-native
 ```
 
-You can also use the helper script:
+也可以使用辅助脚本：
 
 ```powershell
 .\run-native.ps1
 ```
 
-Run checks during development:
+开发时建议运行：
 
 ```powershell
 cargo fmt --check
 cargo check
 cargo clippy --all-targets -- -D warnings
+cargo test
 ```
 
-## Model Setup
+## 模型安装
 
-Model files are not included in this repository. You need to download a local SenseVoice-compatible model and point the app to that folder.
+仓库不包含模型文件。你需要自行下载一个本地 SenseVoice 兼容模型，并在应用设置中指向该文件夹。
 
-Recommended model:
+推荐模型：
 
 ```text
 sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 ```
 
-Official model reference: [sherpa-onnx SenseVoice pre-trained models](https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html).
+官方模型说明：[sherpa-onnx SenseVoice pre-trained models](https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html)。
 
-By default, the app looks for this sibling directory:
+应用默认查找这个相邻目录：
 
 ```text
 ../official-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 ```
 
-Recommended directory shape:
+推荐目录结构：
 
 ```text
 official-models/
-└── sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
-    ├── model.int8.onnx
-    └── tokens.txt
+  sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
+    model.int8.onnx
+    tokens.txt
 ```
 
-Download example:
+下载示例：
 
 ```powershell
 mkdir ..\official-models
@@ -128,64 +129,64 @@ tar -xjf sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2
 cd ..\vibe-coding-voice
 ```
 
-Then open the app:
+然后打开应用：
 
-1. Click the settings icon.
-2. Confirm the model directory, or click `选择文件夹` to choose the downloaded model folder.
-3. Click `检查 SenseVoice`.
-4. Return to the home page and start recording.
+1. 点击右上角设置图标。
+2. 确认模型目录，或点击 `选择文件夹` 选择刚下载解压后的模型文件夹。
+3. 点击 `检查 SenseVoice`。
+4. 回到主页，开始录音。
 
-See [docs/MODELS.md](docs/MODELS.md) for detailed download, directory layout, compatibility, and troubleshooting notes.
+更详细的模型下载、目录结构、兼容性和排错说明见 [docs/MODELS.zh-CN.md](docs/MODELS.zh-CN.md)。
 
-## Model Licenses
+## 模型许可证
 
-The MIT license in this repository applies to this project's source code. It does not apply to third-party model weights.
+本仓库的 MIT 许可证只适用于项目源码，不适用于第三方模型权重。
 
-Before using, redistributing, or packaging a model, check:
+使用、分发或打包模型前，请确认：
 
-- The model license
-- The `LICENSE` file inside the downloaded model directory, if present
-- Whether commercial use is allowed
-- Whether redistribution is allowed
-- Whether attribution is required
-- Whether converted ONNX artifacts can be shared
+- 模型许可证
+- 下载模型目录中是否包含 `LICENSE`
+- 是否允许商业使用
+- 是否允许再次分发
+- 是否要求署名
+- 转换或量化后的 ONNX 文件是否可以分享
 
-## Third-Party Notices
+## 第三方声明
 
-This project uses open-source Rust crates and local model/runtime ecosystems. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and model notice guidance.
+项目使用了一些开源 Rust crate 和本地模型生态。依赖和模型边界说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-## Project Structure
+## 项目结构
 
 ```text
 .
-├── src/
-│   ├── app.rs                 # Main UI, settings page, recording panel, result panel
-│   ├── hotkeys.rs             # Global shortcut registration and event handling
-│   ├── main.rs                # Window, fonts, app initialization
-│   ├── sensevoice.rs          # Model probing, compatibility helpers, transcription
-│   ├── services.rs            # Recording, transcription, delivery, overlay orchestration
-│   ├── state.rs               # App state and defaults
-│   └── tray.rs                # Tray integration
-├── assets/                    # App-owned bundled UI assets
-├── docs/
-├── recording-overlay.ps1      # Lightweight recording status overlay
-├── run-native.ps1             # Local run helper
-├── Cargo.toml
-├── Cargo.lock
-└── README.md
+  src/
+    app.rs                 主界面、设置页、录音区、结果区
+    hotkeys.rs             全局快捷键注册和事件处理
+    main.rs                窗口、字体、应用初始化
+    sensevoice.rs          模型检测、兼容处理、转写
+    services.rs            录音、转写、文本发送、浮窗编排
+    state.rs               应用状态和默认值
+    tray.rs                托盘集成
+  assets/                  应用自带 UI 资源
+  docs/                    文档和预览资源
+  recording-overlay.ps1    录音状态浮窗
+  run-native.ps1           本地运行脚本
+  Cargo.toml
+  Cargo.lock
+  README.md
 ```
 
-## Development Notes
+## 开发说明
 
-Important entry points:
+主要入口：
 
-- `src/main.rs`: app bootstrap, fonts, native window configuration
-- `src/app.rs`: visual layout, controls, pages, and interaction state
-- `src/services.rs`: recording pipeline, transcription flow, and text delivery
-- `src/sensevoice.rs`: model directory detection and transcription engine loading
-- `recording-overlay.ps1`: standalone overlay process used while recording or processing
+- `src/main.rs`：应用启动、字体、原生窗口配置
+- `src/app.rs`：界面布局、控件、页面、交互状态
+- `src/services.rs`：录音管线、转写流程、文本投递
+- `src/sensevoice.rs`：模型目录识别和转写引擎加载
+- `recording-overlay.ps1`：录音或处理中使用的独立浮窗
 
-Before opening a pull request, run:
+提交 PR 前建议运行：
 
 ```powershell
 cargo fmt --check
@@ -194,19 +195,19 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-## Roadmap
+## 路线图
 
-- Improve release packaging for non-developer users
-- Add clearer model setup diagnostics
-- Improve focus restoration after recording
-- Add automated release builds
-- Explore cross-platform support after the Windows workflow is stable
-- Revisit optional ASR backends after the default SenseVoice workflow is stable
+- 改进面向普通用户的 Release 安装体验
+- 增强模型设置诊断信息
+- 改进录音后的输入焦点恢复
+- 完善自动发布构建
+- 在 Windows 工作流稳定后探索跨平台支持
+- 在默认 SenseVoice 流程稳定后重新评估可选 ASR 后端
 
-## Contributing
+## 参与贡献
 
-Contributions are welcome while the project is still young. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull requests.
+项目还很年轻，欢迎提交 issue 和 pull request。贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## License
+## 许可证
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+本项目使用 MIT 许可证。详情见 [LICENSE](LICENSE)。
