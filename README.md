@@ -1,5 +1,7 @@
 # Vibe Coding Voice Native
 
+[简体中文说明](README.zh-CN.md)
+
 Vibe Coding Voice Native is a local-first Windows voice input tool for developers. It records speech from your microphone, transcribes it with a local SenseVoice-compatible model, and sends the result back to the active input field.
 
 The app is built with Rust and egui. It is designed around Chinese and mixed Chinese/English developer dictation, global hotkeys, a small native UI, local microphone capture, a recording overlay, and a local transcription path that does not intentionally upload audio to a remote service.

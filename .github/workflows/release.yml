@@ -44,10 +44,12 @@ jobs:
           Copy-Item assets $bundle/assets -Recurse
           Copy-Item recording-overlay.ps1 $bundle/
           Copy-Item README.md $bundle/
+          Copy-Item README.zh-CN.md $bundle/
           Copy-Item LICENSE $bundle/
           Copy-Item SECURITY.md $bundle/
           Copy-Item THIRD_PARTY_NOTICES.md $bundle/
           Copy-Item docs/MODELS.md $bundle/
+          Copy-Item docs/MODELS.zh-CN.md $bundle/
           Compress-Archive -Path $bundle -DestinationPath "$bundle.zip" -Force
           Get-FileHash "$bundle.zip" -Algorithm SHA256 | ForEach-Object {
             "$($_.Hash)  $bundle.zip" | Set-Content "$bundle.zip.sha256"
