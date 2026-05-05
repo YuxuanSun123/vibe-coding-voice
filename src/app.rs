@@ -1269,35 +1269,38 @@ impl VoiceInputNativeApp {
     }
 
     fn paint_mic_icon(&self, painter: &egui::Painter, center: egui::Pos2, color: Color32) {
-        let stroke = Stroke::new(3.6, color);
         let body = egui::Rect::from_center_size(
             center + egui::vec2(0.0, -8.0),
-            egui::vec2(16.0, 25.0),
+            egui::vec2(18.0, 24.0),
         );
-        painter.rect_stroke(body, CornerRadius::same(8), stroke, StrokeKind::Inside);
+        painter.rect_stroke(
+            body,
+            CornerRadius::same(9),
+            Stroke::new(3.4, color),
+            StrokeKind::Inside,
+        );
+
+        let support_stroke = Stroke::new(3.4, color);
+        let support_path = vec![
+            center + egui::vec2(-11.0, -0.5),
+            center + egui::vec2(-11.0, 5.0),
+            center + egui::vec2(-8.5, 9.5),
+            center + egui::vec2(-4.5, 12.5),
+            center + egui::vec2(0.0, 13.5),
+            center + egui::vec2(4.5, 12.5),
+            center + egui::vec2(8.5, 9.5),
+            center + egui::vec2(11.0, 5.0),
+            center + egui::vec2(11.0, -0.5),
+        ];
+        painter.add(egui::Shape::line(support_path, support_stroke));
+
         painter.line_segment(
-            [center + egui::vec2(-13.0, -2.0), center + egui::vec2(-13.0, 4.0)],
-            stroke,
+            [center + egui::vec2(0.0, 13.5), center + egui::vec2(0.0, 21.5)],
+            Stroke::new(3.2, color),
         );
         painter.line_segment(
-            [center + egui::vec2(13.0, -2.0), center + egui::vec2(13.0, 4.0)],
-            stroke,
-        );
-        painter.line_segment(
-            [center + egui::vec2(-13.0, 4.0), center + egui::vec2(-6.0, 12.0)],
-            stroke,
-        );
-        painter.line_segment(
-            [center + egui::vec2(13.0, 4.0), center + egui::vec2(6.0, 12.0)],
-            stroke,
-        );
-        painter.line_segment(
-            [center + egui::vec2(0.0, 14.0), center + egui::vec2(0.0, 23.0)],
-            stroke,
-        );
-        painter.line_segment(
-            [center + egui::vec2(-10.0, 25.0), center + egui::vec2(10.0, 25.0)],
-            stroke,
+            [center + egui::vec2(-9.0, 24.0), center + egui::vec2(9.0, 24.0)],
+            Stroke::new(3.2, color),
         );
     }
 

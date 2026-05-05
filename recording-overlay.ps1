@@ -96,18 +96,32 @@ function Draw-MicButton($Graphics, [float]$CenterX, [float]$CenterY) {
     $fillBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(10, 10, 10))
     $Graphics.FillEllipse($fillBrush, ($CenterX - 19), ($CenterY - 19), 38, 38)
 
-    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.0)
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.2)
     $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
     $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $pen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
 
-    $bodyRect = New-Object System.Drawing.RectangleF(($CenterX - 4.0), ($CenterY - 9.5), 8.0, 12.0)
-    $Graphics.DrawArc($pen, $bodyRect, 0, 360)
+    $bodyPath = New-RoundedRectPath ($CenterX - 4.6) ($CenterY - 10.0) 9.2 12.2 4.6
+    $Graphics.DrawPath($pen, $bodyPath)
 
-    $archRect = New-Object System.Drawing.RectangleF(($CenterX - 9.0), ($CenterY - 2.0), 18.0, 12.0)
-    $Graphics.DrawArc($pen, $archRect, 12, 156)
+    $supportPoints = @(
+        (New-Object System.Drawing.PointF(($CenterX - 8.6), ($CenterY - 0.8))),
+        (New-Object System.Drawing.PointF(($CenterX - 8.6), ($CenterY + 4.2))),
+        (New-Object System.Drawing.PointF(($CenterX - 6.8), ($CenterY + 7.8))),
+        (New-Object System.Drawing.PointF(($CenterX - 3.8), ($CenterY + 10.0))),
+        (New-Object System.Drawing.PointF($CenterX, ($CenterY + 10.8))),
+        (New-Object System.Drawing.PointF(($CenterX + 3.8), ($CenterY + 10.0))),
+        (New-Object System.Drawing.PointF(($CenterX + 6.8), ($CenterY + 7.8))),
+        (New-Object System.Drawing.PointF(($CenterX + 8.6), ($CenterY + 4.2))),
+        (New-Object System.Drawing.PointF(($CenterX + 8.6), ($CenterY - 0.8)))
+    )
+    $Graphics.DrawLines($pen, $supportPoints)
 
-    $Graphics.DrawLine($pen, $CenterX, ($CenterY + 3.5), $CenterX, ($CenterY + 7.5))
-    $Graphics.DrawLine($pen, ($CenterX - 3.5), ($CenterY + 8.2), ($CenterX + 3.5), ($CenterY + 8.2))
+    $stemPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.0)
+    $stemPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $stemPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $Graphics.DrawLine($stemPen, $CenterX, ($CenterY + 10.8), $CenterX, ($CenterY + 16.6))
+    $Graphics.DrawLine($stemPen, ($CenterX - 6.6), ($CenterY + 18.4), ($CenterX + 6.6), ($CenterY + 18.4))
 }
 
 $script:fontFamily = 'Microsoft YaHei UI'
