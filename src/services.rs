@@ -673,8 +673,13 @@ fn ensure_overlay_host_running() -> Result<()> {
         }
 
         *guard = None;
-        let overlay_script =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recording-overlay.ps1");
+        let overlay_script = std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(|parent| parent.join("recording-overlay.ps1")))
+            .filter(|path| path.exists())
+            .unwrap_or_else(|| {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recording-overlay.ps1")
+            });
         let state_file = overlay_state_path();
         let child = Command::new("powershell.exe")
             .arg("-NoProfile")

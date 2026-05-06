@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="Vibe Coding Voice Native"
+    Language="1033"
+    Version="0.1.0"
+    Manufacturer="Yuxuan Sun"
+    UpgradeCode="1f5c1d9b-802b-47f0-8f56-dc4f7cf55e5c">
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="Vibe Coding Voice Native"
+      Comments="Local-first Windows voice input tool for vibe coding." />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Vibe Coding Voice Native is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="Vibe Coding Voice Native" Level="1">
+      <ComponentGroupRef Id="ReleaseFiles" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="Vibe Coding Voice Native" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="Vibe Coding Voice Native" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="8b41a718-a8cd-4e88-93aa-0a0f171a7c8f">
+        <Shortcut
+          Id="ApplicationStartMenuShortcut"
+          Name="Vibe Coding Voice Native"
+          Description="Start Vibe Coding Voice Native"
+          Target="[INSTALLFOLDER]vibe-coding-voice-native.exe"
+          WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\YuxuanSun\VibeCodingVoiceNative"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Product>
+</Wix>

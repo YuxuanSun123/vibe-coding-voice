@@ -33,9 +33,9 @@ The first image shows the main app layout. The GIF is a lightweight documentatio
 
 ## Not Yet Guaranteed
 
-- Production-grade packaging and auto-update
+- Production-grade auto-update
 - Cross-platform support
-- Complete installer or in-app model downloader
+- In-app model downloader
 - Stable extension APIs
 - Local Whisper.cpp backend
 
@@ -68,6 +68,15 @@ Experimental work on additional ASR backends may happen later. The current publi
 - A working microphone
 - A local SenseVoice-compatible model directory
 - A DashScope API Key if you use the online model path
+
+## Download And Install
+
+The Release page provides two Windows packages:
+
+- `.msi`: installer build for regular users. Install it, then launch the app from the Start menu.
+- `.zip`: portable build for users who prefer to extract and manage files manually.
+
+Release packages do not include model files. For local mode, follow the model setup section below or read [docs/MODELS.md](docs/MODELS.md). For online mode, enter your own DashScope API Key in settings.
 
 ## Quick Start
 
@@ -220,7 +229,7 @@ cargo test
 
 ## Roadmap
 
-- Improve release packaging for non-developer users
+- Improve release update experience for non-developer users
 - Add clearer model setup diagnostics
 - Improve focus restoration after recording
 - Add automated release builds
