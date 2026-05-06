@@ -36,22 +36,24 @@ tar -xjf sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2
 cd ..\vibe-coding-voice
 ```
 
-应用默认模型路径是：
+Release 版默认优先查找程序所在目录下的模型文件夹：
 
 ```text
-../official-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
+models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 ```
 
 例如：
 
 ```text
-workspace/
-  vibe-coding-voice/
-  official-models/
+vibe-coding-voice-native-windows-v0.1.0-alpha.1/
+  vibe-coding-voice-native.exe
+  models/
     sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
       model.int8.onnx
       tokens.txt
 ```
+
+源码开发运行时，也可以把模型放在仓库相邻的 `official-models` 目录。
 
 如果你把模型放在其他位置，可以在应用设置里手动选择该文件夹。
 

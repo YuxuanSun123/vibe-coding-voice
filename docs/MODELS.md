@@ -36,22 +36,24 @@ tar -xjf sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2
 cd ..\vibe-coding-voice
 ```
 
-The app's default model path is:
+Release builds first look for a model folder next to the executable:
 
 ```text
-../official-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
+models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 ```
 
 For example:
 
 ```text
-workspace/
-├── vibe-coding-voice/
-└── official-models/
+vibe-coding-voice-native-windows-v0.1.0-alpha.1/
+├── vibe-coding-voice-native.exe
+└── models/
     └── sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
         ├── model.int8.onnx
         └── tokens.txt
 ```
+
+When running from source, you can also place the model in a sibling `official-models` directory.
 
 If you place the model somewhere else, open the app settings and choose that folder manually.
 

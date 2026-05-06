@@ -8,6 +8,9 @@ use transcribe_rs::{
     },
 };
 
+const DEFAULT_SENSEVOICE_MODEL_DIR_NAME: &str =
+    "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17";
+
 #[derive(Debug, Clone)]
 pub struct SenseVoiceProbe {
     pub model_dir: PathBuf,
@@ -25,12 +28,21 @@ pub struct SenseVoiceTranscript {
 }
 
 pub fn default_model_dir() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .unwrap_or(manifest_dir.as_path())
+    let release_default = current_exe_dir()
+        .join("models")
+        .join(DEFAULT_SENSEVOICE_MODEL_DIR_NAME);
+    if release_default.exists() {
+        return release_default;
+    }
+
+    let release_official_models = current_exe_dir()
         .join("official-models")
-        .join("sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17")
+        .join(DEFAULT_SENSEVOICE_MODEL_DIR_NAME);
+    if release_official_models.exists() {
+        return release_official_models;
+    }
+
+    development_model_dir()
 }
 
 pub fn prepare_and_probe(model_dir: &Path) -> Result<SenseVoiceProbe> {
@@ -202,4 +214,20 @@ fn detect_model_params(model_dir: &Path) -> Result<SenseVoiceModelParams> {
 
 fn canonicalize_or_original(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn current_exe_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
+
+fn development_model_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent()
+        .unwrap_or(manifest_dir.as_path())
+        .join("official-models")
+        .join(DEFAULT_SENSEVOICE_MODEL_DIR_NAME)
 }

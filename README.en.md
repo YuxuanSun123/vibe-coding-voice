@@ -105,13 +105,24 @@ sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 
 Official model reference: [sherpa-onnx SenseVoice pre-trained models](https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html).
 
-By default, the app looks for this sibling directory:
+Release builds first look for a model folder next to the executable:
 
 ```text
-../official-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
+models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 ```
 
 Recommended directory shape:
+
+```text
+vibe-coding-voice-native-windows-v0.1.0-alpha.1/
+├── vibe-coding-voice-native.exe
+└── models/
+    └── sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
+        ├── model.int8.onnx
+        └── tokens.txt
+```
+
+When running from source, you can also place the model in a sibling `official-models` directory:
 
 ```text
 official-models/

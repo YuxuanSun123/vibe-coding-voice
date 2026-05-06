@@ -106,13 +106,24 @@ sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 
 官方模型说明：[sherpa-onnx SenseVoice pre-trained models](https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html)。
 
-应用默认查找这个相邻目录：
+Release 版默认优先查找程序所在目录下的模型文件夹：
 
 ```text
-../official-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
+models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 ```
 
 推荐目录结构：
+
+```text
+vibe-coding-voice-native-windows-v0.1.0-alpha.1/
+  vibe-coding-voice-native.exe
+  models/
+    sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/
+      model.int8.onnx
+      tokens.txt
+```
+
+开发源码运行时，也可以把模型放在仓库相邻的 `official-models` 目录：
 
 ```text
 official-models/
