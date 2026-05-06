@@ -14,11 +14,15 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GetForegroundWindow, PostMessageW, SetForegroundWindow, WM_CLOSE,
 };
 
 const TARGET_SAMPLE_RATE: u32 = 16_000;
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 struct RecordingSession {
     _stream: Stream,
@@ -338,16 +342,16 @@ pub fn check_online_model(state: &mut NativeAppState) {
         language: state.qwen_language.clone(),
     };
 
-    match qwen_asr::validate_config(&config) {
+    match qwen_asr::probe_connection(&config) {
         Ok(()) => {
             state.qwen_ready = true;
-            state.qwen_status = format!("Qwen-ASR Realtime 已配置: {}", config.model);
+            state.qwen_status = format!("Qwen-ASR Realtime 连接检查通过: {}", config.model);
             state.status_message =
-                "在线模型配置已就绪，录音结束后将调用 Qwen-ASR Realtime。".to_string();
+                "在线模型连接检查通过，录音结束后将调用 Qwen-ASR Realtime。".to_string();
         }
         Err(error) => {
             state.qwen_ready = false;
-            state.qwen_status = format!("Qwen-ASR 配置不完整: {error:#}");
+            state.qwen_status = format!("Qwen-ASR 连接检查失败: {error:#}");
             state.input_state = InputState::Error;
             state.status_message =
                 "在线模型暂时不可用，请检查 API Key、模型名和 WebSocket 地址。".to_string();
@@ -684,8 +688,11 @@ fn ensure_overlay_host_running() -> Result<()> {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recording-overlay.ps1")
             });
         let state_file = overlay_state_path();
-        let child = Command::new("powershell.exe")
+        let mut command = Command::new("powershell.exe");
+        command
+            .creation_flags(CREATE_NO_WINDOW)
             .arg("-NoProfile")
+            .arg("-NonInteractive")
             .arg("-ExecutionPolicy")
             .arg("Bypass")
             .arg("-WindowStyle")
@@ -695,8 +702,10 @@ fn ensure_overlay_host_running() -> Result<()> {
             .arg(&overlay_script)
             .arg("-StateFile")
             .arg(&state_file)
+            .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+        let child = command
             .spawn()
             .with_context(|| format!("启动录音浮层失败: {}", overlay_script.display()))?;
 
