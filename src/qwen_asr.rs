@@ -3,8 +3,7 @@ use base64::{Engine as _, engine::general_purpose};
 use serde_json::{Value, json};
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tungstenite::client::IntoClientRequest;
 use tungstenite::{Message, connect};
 
@@ -29,7 +28,10 @@ pub fn validate_config(config: &QwenAsrConfig) -> Result<()> {
     if api_key.is_empty() {
         bail!("请先填写 DashScope API Key。");
     }
-    if api_key.chars().any(|ch| ch.is_control() || ch.is_whitespace()) {
+    if api_key
+        .chars()
+        .any(|ch| ch.is_control() || ch.is_whitespace())
+    {
         bail!("DashScope API Key 不能包含空格或换行，请重新粘贴纯 API Key。");
     }
     if config.model.trim().is_empty() {
@@ -54,9 +56,9 @@ pub fn probe_connection(config: &QwenAsrConfig) -> Result<()> {
         let _ = sender.send(result);
     });
 
-    receiver
-        .recv_timeout(PROBE_TIMEOUT)
-        .unwrap_or_else(|_| bail!("连接 Qwen-ASR Realtime 超时，请检查 API Key、网络或 WebSocket 地址。"))
+    receiver.recv_timeout(PROBE_TIMEOUT).unwrap_or_else(|_| {
+        bail!("连接 Qwen-ASR Realtime 超时，请检查 API Key、网络或 WebSocket 地址。")
+    })
 }
 
 pub fn transcribe_audio(config: &QwenAsrConfig, samples: Vec<f32>) -> Result<QwenAsrTranscript> {

@@ -8,13 +8,13 @@ use cpal::{SampleFormat, Stream, StreamConfig};
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use serde_json::json;
 use std::fs;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GetForegroundWindow, PostMessageW, SetForegroundWindow, WM_CLOSE,
