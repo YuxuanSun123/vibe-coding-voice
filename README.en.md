@@ -12,11 +12,9 @@ This project is in alpha. It is useful for local experimentation and daily dogfo
 
 ## Preview
 
-![Home preview](docs/assets/home-preview.png)
+![Home preview](docs/assets/voice.png)
 
-![Dictation flow preview](docs/assets/demo-flow.gif)
-
-The first image shows the main app layout. The GIF is a lightweight documentation preview of the dictation flow.
+The homepage appears as shown in the figure.
 
 ## Currently Supported
 
